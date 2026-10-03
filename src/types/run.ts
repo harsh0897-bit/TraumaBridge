@@ -56,7 +56,7 @@ export interface VitalObservation {
 
 export interface IdentityDocument {
   id: string
-  type: 'aadhaar' | 'driving-licence' | 'hospital-card' | 'prescription' | 'other'
+  type: 'aadhaar' | 'driving-licence' | 'hospital-card' | 'prescription' | 'national-id' | 'other'
   title: string
   photoUrl: string
   extractedText?: string

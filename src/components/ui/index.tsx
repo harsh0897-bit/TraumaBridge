@@ -332,13 +332,13 @@ export function DemoBanner() {
 // ─── Step Progress Indicator ──────────────────────────────────────────────────
 
 const WIZARD_STEPS = [
-  { id: 'patient', label: 'Patient' },
-  { id: 'incident', label: 'Incident' },
-  { id: 'injuries', label: 'Injuries' },
-  { id: 'vitals', label: 'Vitals' },
-  { id: 'treatments', label: 'Treatment' },
-  { id: 'mist', label: 'MIST' },
-  { id: 'review', label: 'Review & Send' },
+  { id: 'patient', label: 'Patient', short: 'Pt' },
+  { id: 'incident', label: 'Incident', short: 'Scene' },
+  { id: 'injuries', label: 'Injuries', short: 'Injuries' },
+  { id: 'vitals', label: 'Vitals', short: 'Vitals' },
+  { id: 'treatments', label: 'Treatment', short: 'Tx' },
+  { id: 'mist', label: 'MIST', short: 'MIST' },
+  { id: 'review', label: 'Review & Send', short: 'Review' },
 ] as const
 
 type StepId = typeof WIZARD_STEPS[number]['id']
@@ -353,64 +353,73 @@ interface WizardProgressProps {
 export function WizardProgress({ currentStep, completedSteps, onStepClick, nightMode }: WizardProgressProps) {
   // Normalize review / handover
   const activeNormalized = currentStep === 'handover' ? 'review' : currentStep
+  const currentIndex = Math.max(0, WIZARD_STEPS.findIndex((s) => s.id === activeNormalized))
+  const progressPercent = Math.round(((currentIndex + 1) / WIZARD_STEPS.length) * 100)
 
   return (
-    <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto py-1">
-      {WIZARD_STEPS.map((step, i) => {
-        const isCompleted = completedSteps.includes(step.id) || (step.id === 'review' && completedSteps.includes('handover'))
-        const isCurrent = activeNormalized === step.id
-        const isClickable = (isCompleted || isCurrent) && onStepClick
+    <div className="w-full flex flex-col gap-1.5 py-0.5">
+      {/* Step Pills Row */}
+      <div className="flex items-center justify-between gap-1 sm:gap-2">
+        {WIZARD_STEPS.map((step, i) => {
+          const isCompleted = completedSteps.includes(step.id) || (step.id === 'review' && completedSteps.includes('handover'))
+          const isCurrent = activeNormalized === step.id
+          const isClickable = (isCompleted || isCurrent) && onStepClick
 
-        return (
-          <div key={step.id} className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+          return (
             <button
+              key={step.id}
               type="button"
               onClick={() => isClickable && onStepClick(step.id)}
               disabled={!isClickable}
+              title={`${i + 1}. ${step.label}`}
               className={cn(
-                'flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all duration-150 select-none',
+                'flex items-center gap-1.5 px-2 py-1 rounded-xl text-xs font-semibold transition-all duration-150 select-none flex-1 justify-center min-w-0',
                 isCurrent
-                  ? 'bg-sky-500 text-white font-semibold shadow-sm shadow-sky-500/30'
+                  ? nightMode
+                    ? 'bg-sky-500 text-white shadow-md shadow-sky-500/25 ring-1 ring-sky-400'
+                    : 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
                   : isCompleted
                   ? nightMode
-                    ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 cursor-pointer'
-                    : 'text-emerald-700 bg-emerald-50 border border-emerald-200/80 hover:bg-emerald-100/60 cursor-pointer'
+                    ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 cursor-pointer'
+                    : 'text-emerald-700 bg-emerald-50 border border-emerald-200/80 hover:bg-emerald-100/70 cursor-pointer'
                   : nightMode
-                  ? 'text-slate-500 bg-transparent cursor-default'
-                  : 'text-slate-400 bg-transparent cursor-default'
+                  ? 'text-slate-500 bg-[#14233C]/60 border border-[#1E3559]/40 cursor-default'
+                  : 'text-slate-400 bg-slate-100/80 border border-slate-200/60 cursor-default'
               )}
             >
               <span
                 className={cn(
-                  'w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0',
+                  'w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-mono font-bold flex-shrink-0',
                   isCurrent
                     ? 'bg-white text-sky-600'
                     : isCompleted
                     ? 'bg-emerald-500 text-white'
                     : nightMode
-                    ? 'bg-[#1E3A5F] text-slate-400'
+                    ? 'bg-[#1E3559] text-slate-400'
                     : 'bg-slate-200 text-slate-500'
                 )}
               >
                 {isCompleted ? '✓' : i + 1}
               </span>
-              <span className="hidden md:inline whitespace-nowrap">{step.label}</span>
+              <span className="hidden lg:inline truncate text-[11px] tracking-tight">{step.label}</span>
+              <span className="hidden sm:inline lg:hidden truncate text-[11px] tracking-tight">{step.short}</span>
             </button>
-            {i < WIZARD_STEPS.length - 1 && (
-              <div
-                className={cn(
-                  'w-2.5 sm:w-4 h-[2px] rounded-full',
-                  isCompleted
-                    ? 'bg-emerald-400'
-                    : nightMode
-                    ? 'bg-[#1E3A5F]'
-                    : 'bg-slate-200'
-                )}
-              />
-            )}
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
+
+      {/* Linear Continuous Progress Bar */}
+      <div
+        className={cn(
+          'w-full h-1 rounded-full overflow-hidden',
+          nightMode ? 'bg-[#162744]' : 'bg-slate-100'
+        )}
+      >
+        <div
+          className="h-full bg-gradient-to-r from-sky-500 via-teal-400 to-emerald-400 rounded-full transition-all duration-300"
+          style={{ width: `${progressPercent}%` }}
+        />
+      </div>
     </div>
   )
 }
