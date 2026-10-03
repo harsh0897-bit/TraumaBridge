@@ -103,7 +103,9 @@ All colors, depths, and surfaces are strictly locked. Component code must refere
 
 ### DO:
 - Keep the shell strictly within `100dvh` with `overflow: hidden`.
-- Provide one dominant hero tile with rich visual focus.
+- Provide one dominant hero tile with rich visual focus using `.tile-hero`.
+- Use `.tile-hero` and `.pattern-stripes` plain CSS classes (never rely on complex Tailwind utilities for critical gradients/patterns).
+- Use hard or clamp() sizes for tiles (never 1fr rows that stretch into empty voids).
 - Use circular outlined arrow buttons (36px) on tile headers.
 - Show units (`bpm`, `mmHg`, `%`, `/min`) and timestamp sources on all clinical data.
 - Use diagonal-stripe SVG fill patterns for pending/in-progress segments.
@@ -117,3 +119,4 @@ All colors, depths, and surfaces are strictly locked. Component code must refere
 - NEVER nest cards with the same radius inside each other.
 - NEVER let animations loop continuously (only live sync dot and countdown tick).
 - NEVER use raw inline hex codes in component files.
+

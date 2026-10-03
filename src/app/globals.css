@@ -389,3 +389,26 @@ body {
   from { stroke-dashoffset: 200; }
   to { stroke-dashoffset: 0; }
 }
+
+/* ── Hospital Console Locked CSS Classes (Never rely on Tailwind utilities) ── */
+.tile-hero {
+  background-color: #0F3F82;
+  background-image: 
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' fill='none'%3E%3Ccircle cx='150' cy='150' r='40' stroke='white' stroke-width='2.5' stroke-opacity='0.06'/%3E%3Ccircle cx='150' cy='150' r='70' stroke='white' stroke-width='2.5' stroke-opacity='0.06'/%3E%3Ccircle cx='150' cy='150' r='100' stroke='white' stroke-width='2.5' stroke-opacity='0.06'/%3E%3Ccircle cx='150' cy='150' r='130' stroke='white' stroke-width='2.5' stroke-opacity='0.06'/%3E%3C/svg%3E"),
+    linear-gradient(135deg, #0F3F82 0%, #1B5FB4 100%);
+  background-repeat: no-repeat, no-repeat;
+  background-position: right -10px bottom -10px, center;
+  background-size: 260px 260px, cover;
+  color: #FFFFFF;
+}
+
+.pattern-stripes {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(148, 163, 184, 0.25),
+    rgba(148, 163, 184, 0.25) 6px,
+    transparent 6px,
+    transparent 12px
+  );
+}
+

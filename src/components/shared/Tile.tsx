@@ -59,27 +59,11 @@ export function Tile({
       className={cn(
         'relative rounded-tile p-5 overflow-hidden border transition-shadow',
         isHero
-          ? 'bg-[linear-gradient(135deg,var(--primary-deep)_0%,var(--hero-to)_100%)] text-white border-transparent shadow-tile'
+          ? 'tile-hero border-transparent shadow-tile text-white'
           : 'bg-tile text-ink border-border shadow-tile',
         className
       )}
     >
-      {/* Hero tone faint concentric-arc pattern (SVG, 6% opacity) */}
-      {isHero && (
-        <svg
-          aria-hidden="true"
-          className="absolute -right-8 -bottom-8 w-64 h-64 pointer-events-none opacity-6 select-none"
-          viewBox="0 0 200 200"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <circle cx="150" cy="150" r="40" stroke="white" strokeWidth="2.5" />
-          <circle cx="150" cy="150" r="70" stroke="white" strokeWidth="2.5" />
-          <circle cx="150" cy="150" r="100" stroke="white" strokeWidth="2.5" />
-          <circle cx="150" cy="150" r="130" stroke="white" strokeWidth="2.5" />
-        </svg>
-      )}
-
       {/* Tile Header (if title or action is provided) */}
       {(title || ActionButton) && (
         <div className="relative z-10 flex items-center justify-between gap-3 mb-4">
@@ -100,7 +84,7 @@ export function Tile({
       )}
 
       {/* Tile Body */}
-      <div className="relative z-10">{children}</div>
+      <div className="relative z-10 flex-1 flex flex-col min-h-0">{children}</div>
     </motion.div>
   )
 }

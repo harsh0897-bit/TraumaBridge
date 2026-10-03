@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useId } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { cn } from '@/lib/utils'
 import { ease, durations } from '@/lib/motion'
@@ -10,32 +10,43 @@ export interface SparklineProps {
   width?: number
   height?: number
   color?: string
+  fillOpacity?: number
   showDot?: boolean
   className?: string
 }
 
 export function Sparkline({
   data,
-  width = 100,
-  height = 36,
+  width = 96,
+  height = 40,
   color = '#2878D7',
+  fillOpacity = 0.18,
   showDot = true,
   className,
 }: SparklineProps) {
   const reducedMotion = useReducedMotion()
+  const gradientId = useId()
 
   if (!data || data.length < 2) {
-    return null
+    return (
+      <div
+        style={{ width, height }}
+        className={cn('flex items-center justify-center text-[12px] text-ink-2 font-mono', className)}
+      >
+        —
+      </div>
+    )
   }
 
-  const padding = 4
+  const paddingX = 4
+  const paddingY = 5
   const minVal = Math.min(...data)
   const maxVal = Math.max(...data)
   const range = maxVal - minVal || 1
 
   const points = data.map((val, idx) => {
-    const x = padding + (idx / (data.length - 1)) * (width - padding * 2)
-    const y = height - padding - ((val - minVal) / range) * (height - padding * 2)
+    const x = paddingX + (idx / (data.length - 1)) * (width - paddingX * 2)
+    const y = height - paddingY - ((val - minVal) / range) * (height - paddingY * 2)
     return { x, y }
   })
 
@@ -44,6 +55,7 @@ export function Sparkline({
   }, '')
 
   const lastPoint = points[points.length - 1]
+  const firstPoint = points[0]
 
   return (
     <svg
@@ -53,17 +65,17 @@ export function Sparkline({
       className={cn('overflow-visible select-none inline-block', className)}
       aria-hidden="true"
     >
-      {/* Background smooth gradient fill under the line */}
       <defs>
-        <linearGradient id={`sparkline-gradient-${color}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.18" />
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity={fillOpacity} />
           <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
       </defs>
 
+      {/* Area Fill Under Curve */}
       <path
-        d={`${pathD} L ${lastPoint.x},${height} L ${points[0].x},${height} Z`}
-        fill={`url(#sparkline-gradient-${color})`}
+        d={`${pathD} L ${lastPoint.x},${height} L ${firstPoint.x},${height} Z`}
+        fill={`url(#${gradientId})`}
       />
 
       {/* Main Sparkline Stroke */}
@@ -71,7 +83,7 @@ export function Sparkline({
         d={pathD}
         fill="none"
         stroke={color}
-        strokeWidth="2"
+        strokeWidth="2.2"
         strokeLinecap="round"
         strokeLinejoin="round"
         initial={reducedMotion ? { pathLength: 1 } : { pathLength: 0 }}
@@ -79,7 +91,7 @@ export function Sparkline({
         transition={{ duration: durations.gentle, ease }}
       />
 
-      {/* Optional Last Point Dot */}
+      {/* Last Point Dot */}
       {showDot && (
         <motion.circle
           cx={lastPoint.x}
@@ -90,7 +102,7 @@ export function Sparkline({
           strokeWidth="1.5"
           initial={reducedMotion ? { scale: 1 } : { scale: 0 }}
           animate={{ scale: 1 }}
-          transition={{ delay: durations.gentle, duration: durations.fast, ease }}
+          transition={{ delay: durations.gentle * 0.7, duration: durations.fast, ease }}
         />
       )}
     </svg>
