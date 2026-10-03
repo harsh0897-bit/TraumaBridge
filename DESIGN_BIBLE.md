@@ -1,91 +1,119 @@
-﻿# TRAUMABRIDGE AI — DESIGN BIBLE
-> Version 1.0 · Phase 1 Foundation · October 2026
+# TRAUMABRIDGE AI — DESIGN BIBLE
+> Version 2.0 · Hospital Console Foundation & Design Tokens · October 2026
 
-## 1. CREATIVE DIRECTION
+## 1. CREATIVE DIRECTION & QUALITY BENCHMARK
 
-**Positioning:** TraumaBridge exists at the precise moment when information transfer saves a life. Every design decision must reflect that weight without dramatising it. The product must feel *reliable*, *swift*, and *human-first*.
+The visual foundation for the TraumaBridge Hospital Receiving Console takes direct inspiration from the refined modern productivity interface of the reference design (**Donezo**):
+- **Hero Tile:** One dominant hero tile with rich presence, large typography, and tactile status.
+- **Oversized Numerals:** Clean, high-legibility stat values (44px–64px) with count-up animations.
+- **Generous Spacing & Depth:** Large radius (20px) tiles resting on an ultra-light tinted well (`#F8FBFF`) with barely-there physical elevation shadows.
+- **Tactile Micro-interactions:** Pill buttons, circular outlined action buttons (36px), sliding segmented tabs, and diagonal-stripe pattern for pending segments.
+- **Clinical Sobriety:** No decorative colors, no navy dominance, no cyberpunk/glowing elements, no purple, no glassmorphism.
 
-**Three tones, one identity:**
+---
 
-| Surface | Tone | Priority |
-|---------|------|----------|
-| Public website | Editorial, confident, cinematic | Brand story |
-| Ambulance terminal | High-contrast, tactile, unambiguous | Speed & accuracy |
-| Hospital workspace | Calm, information-rich, hierarchical | Comprehension |
+## 2. LOCKED TOKENS
 
-## 2. VISUAL IDENTITY
+All colors, depths, and surfaces are strictly locked. Component code must reference these tokens via CSS variables or Tailwind theme utilities—never raw ad-hoc hex values.
 
-### Wordmark
-- **Logotype:** TRAUMABRIDGE in Geist — geometric, authoritative
-- **Symbol:** Bridge arc bisected by pulse line — ambulance-to-hospital continuity
-- **Colour:** Navy #0F1E35 on light; accent #0EA5E9 pulse line
+### Surfaces & Neutral Ink
+| Token | Hex / Value | Purpose |
+| :--- | :--- | :--- |
+| `well` | `#F8FBFF` | Viewport canvas / base well |
+| `tile` | `#FFFFFF` | Primary module surface |
+| `border` | `#E3EAF2` | 1px subtle structural border |
+| `ink` | `#111827` | Primary text & high-contrast figures |
+| `ink-2` | `#64748B` | Secondary text, clinical labels, metadata |
 
-## 3. COLOR PALETTE
+### Primary & Action
+| Token | Hex / Value | Purpose |
+| :--- | :--- | :--- |
+| `primary` | `#2878D7` | TraumaBridge interactive action & focus |
+| `primary-soft` | `#EEF5FF` | Active selection, tab indicator, soft highlight |
+| `primary-deep` | `#0F3F82` | Hero tile gradient start (used to `#1B5FB4`) |
+| `hero-to` | `#1B5FB4` | Hero tile gradient end |
 
-### Base
-- navy-950: #0A1628
-- navy-900: #0F1E35 (brand primary)
-- navy-800: #162440
-- slate-50: #F8FAFC (app background)
-- slate-900: #0F172A (heading)
+### Semantic State System (State Only — Never Decorative)
+| State | Solid Ink | Soft Background | Semantic Meaning |
+| :--- | :--- | :--- | :--- |
+| **Success** | `#19A974` | `#ECF9F3` | Confirmed Ready / Normal / Complete |
+| **Warning** | `#D99000` | `#FFF6E4` | Urgent / In Progress / Attention Required |
+| **Critical** | `#D92D20` | `#FFF1EF` | P1 Critical Alert / Severe / Vital Collapse |
 
-### Clinical Accent
-- sky-500: #0EA5E9 (primary action)
-- teal-500: #14B8A6 (secondary accent)
+---
 
-### Semantic
-- red-500: #EF4444 (critical only)
-- amber-400: #FBBF24 (warning only)
-- emerald-500: #10B981 (stable/positive)
+## 3. SHAPE & PHYSICAL DEPTH
 
-## 4. TYPOGRAPHY
+- **Tile Radius:** `20px` (`rounded-tile` / `rounded-[20px]`)
+- **Inner Elements / Insets:** `12px` (`rounded-inner` / `rounded-[12px]`)
+- **Pills / Status Chips:** `999px` (`rounded-pill` / `rounded-full`)
+- **Tile Shadow:** `0 1px 2px rgba(17,24,39,.04), 0 12px 28px -16px rgba(17,24,39,.12)`
+- **Border:** `1px solid var(--border)` (`#E3EAF2`)
+- **Hierarchy Rule:** Never nest a card inside a card with the same radius. Prefer spacing, background contrast, and typographic hierarchy over borders.
 
-- **Geist** (sans) for all UI — Display 4.5rem → Caption 0.75rem
-- **Geist Mono** for data values, timestamps, codes
-- Ambulance minimum: 18px for touch-label text
+---
 
-## 5. SPACING — 4px base unit (space-1 through space-32)
+## 4. TYPOGRAPHY SCALE (MINIMUM 12px RULE)
 
-## 6. LAYOUT
+**Zero text below 12px anywhere.** Tabular numerals (`tabular-nums`) on all numbers, vitals, countdowns, and timestamps.
 
-- 12-column grid, 24px gutter, 1440px max
-- Breakpoints: 480/768/1024/1280/1536
+| Role | Font Family | Size / Weight | Color | Usage |
+| :--- | :--- | :--- | :--- | :--- |
+| **Hero Numeral** | `Geist` | `64px` / `800` | `ink` / `white` (hero) | ETA countdown, hero score |
+| **Stat Numeral** | `Geist` | `44px` / `800` | `ink` | Primary vital figures (HR, BP, SpO₂) |
+| **Tile Title** | `Geist` | `15px` / `600` | `ink` | Module and tile headings |
+| **Body Large** | `Geist` | `14px` / `400`–`500` | `ink` | Patient notes, incident details |
+| **Body Small** | `Geist` | `13px` / `400` | `ink` / `ink-2` | List rows, secondary descriptions |
+| **Labels / Meta** | `Geist` | `12px` / `500` | `ink-2` | Baseline ranges, time since update |
+| **Telemetry / Code** | `Geist Mono` | `12px`–`14px` | `ink` / `ink-2` | Case IDs, timestamps, GCS codes |
 
-## 7. SURFACE HIERARCHY
+---
 
-Public: Hero → Features → Stats → CTA
-Ambulance: Header(48px) → Workspace → Status(40%) → ActionBar(72px)
-Hospital: Sidebar(220px) → Feed → Detail → EventTrail
+## 5. SPACING (4px Base Grid)
 
-## 8. ICONOGRAPHY — Lucide React, 1.5px stroke, 20px default, 48px touch target
+| Token | Pixels | Application |
+| :--- | :--- | :--- |
+| `space-1` | 4px | Icon gap, chip padding |
+| `space-2` | 8px | Micro gaps, badge margins |
+| `space-3` | 12px | Inner element padding, row spacing |
+| `space-4` | 16px | Standard tile internal padding |
+| `space-5` | 20px | Generous tile padding |
+| `space-6` | 24px | Section gaps, grid gutters |
+| `space-8` | 32px | Page margins |
 
-## 9. INTERACTION STATES
+---
 
-Default → Hover(8% darker) → Focus(sky-500 ring) → Pressed(scale 0.97) → Loading(pulse) → Disabled(40% opacity)
+## 6. MOTION TABLE (Motion for React / `src/lib/motion.ts`)
 
-Ambulance: 56x56px minimum touch, 400ms hold for critical actions
+| Interaction | Values | Specs |
+| :--- | :--- | :--- |
+| **Cubic Bezier Ease** | `[0.22, 1, 0.36, 1]` | Global clinical curve |
+| **Spring Preset** | `{ type: "spring", stiffness: 380, damping: 32 }` | Segmented sliding indicators |
+| **Durations** | `fast: 120ms`, `base: 200ms`, `gentle: 320ms`, `countUp: 900ms` | Unified timing scale |
+| **Tile Entrance** | Fade + Rise 12px, staggered 45ms | On initial mount |
+| **Hover Feedback** | Lift -2px + shadow step-up, 180ms | Interactive tiles & rows |
+| **Press Feedback** | Scale `0.98`, 120ms | Button & tab clicks |
+| **Tab Content** | Crossfade + 8px slide, 220ms (`mode="wait"`) | Switching between workspace tabs |
+| **Number Count-Up** | `useCountUp(value, { duration: 0.9 })` | Mount & tween on value update |
+| **Reduced Motion** | Replaces all physical translation with opacity-only | WCAG AA compliance |
 
-## 10. MOTION LANGUAGE — See MOTION_GUIDE.md
+---
 
-Durations: instant(0) → fast(100ms) → base(200ms) → gentle(300ms) → slow(500ms) → cinematic(800ms)
+## 7. DO / DON'T LIST
 
-## 11. ACCESSIBILITY — WCAG 2.1 AA+, prefers-reduced-motion, 4.5:1 min contrast
+### DO:
+- Keep the shell strictly within `100dvh` with `overflow: hidden`.
+- Provide one dominant hero tile with rich visual focus.
+- Use circular outlined arrow buttons (36px) on tile headers.
+- Show units (`bpm`, `mmHg`, `%`, `/min`) and timestamp sources on all clinical data.
+- Use diagonal-stripe SVG fill patterns for pending/in-progress segments.
+- Keep the persistent patient header visible across all tabs.
 
-## 12. IMAGE ART DIRECTION
-
-- Realistic + refined post-processing
-- Cool blue-white primary light, warm amber fill
-- hero-handover.webp, ambulance-interior.webp, ed-coordination.webp, data-bridge.webp
-
-## 13. DESIGN PRINCIPLES FOR EMERGENCY WORKSPACES
-
-1. Glanceability — critical info readable in under 2 seconds
-2. Hierarchy over decoration
-3. Error prevention over recovery
-4. Persistent orientation (patient, mission, status always visible)
-5. Graceful degradation (offline-capable UI)
-6. No animation at cost — never delay critical data render
-7. Semantic colour discipline — red = danger always
-8. Label everything with units and source
-9. Timestamp all events
-10. Confirm before transmitting
+### DON'T:
+- NEVER introduce page-level vertical scrolling.
+- NEVER render text smaller than 12px.
+- NEVER use navy panels, dark mode containers, or cyberpunk glowing borders.
+- NEVER use generic purple, teal, or rainbow badges.
+- NEVER nest cards with the same radius inside each other.
+- NEVER let animations loop continuously (only live sync dot and countdown tick).
+- NEVER use raw inline hex codes in component files.
