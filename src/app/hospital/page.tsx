@@ -171,79 +171,81 @@ export default function HospitalPage() {
       <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,_rgba(240,246,255,0.45)_0%,_rgba(255,255,255,0)_70%)] z-0" />
 
       {/* ── Demo Safeguards Banner ─────────────────────────────────────────── */}
-      <div className="relative z-10 bg-amber-50/90 border-b border-amber-200/80 px-4 sm:px-6 py-2 flex items-center justify-between text-xs text-amber-900 font-sans">
+      <div className="relative z-10 bg-amber-50/80 border-b border-amber-200/60 px-4 sm:px-6 py-1.5 flex items-center justify-between text-xs text-amber-900 font-sans">
         <div className="flex items-center gap-2">
-          <span className="bg-amber-500 text-white font-black px-1.5 py-0.5 rounded text-[10px] font-mono tracking-wider">
-            DEMO RECEIVING CONSOLE
+          <span className="bg-amber-500 text-white font-bold px-1.5 py-0.5 rounded text-[10px] tracking-wider uppercase">
+            Demo Console
           </span>
-          <span className="font-medium text-amber-800 hidden sm:inline">
-            Simulated hospital receiving dashboard · Synthetic clinical events · Not connected to live NHS Spine
+          <span className="font-medium text-amber-800 text-[11px] hidden sm:inline">
+            Simulated hospital receiving dashboard · Synthetic clinical events · Not connected to NHS Spine
           </span>
         </div>
-        <div className="flex items-center gap-3 font-mono text-[11px] text-amber-800">
-          <span className="flex items-center gap-1.5 font-bold">
+        <div className="flex items-center gap-3 text-[11px] text-amber-800">
+          <span className="flex items-center gap-1.5 font-medium">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Telemetry Stream Live</span>
+            <span className="text-emerald-800 font-semibold">Live Telemetry Sync</span>
           </span>
           <span className="text-amber-300">|</span>
-          <span className="font-semibold">{now.toLocaleTimeString('en-GB')}</span>
+          <span suppressHydrationWarning className="font-mono font-medium text-slate-700">{now.toLocaleTimeString('en-GB')}</span>
         </div>
       </div>
 
       {/* ── Top Header ─────────────────────────────────────────────────────── */}
-      <header className="relative z-10 bg-white border-b border-[#E4EAF1] px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+      <header className="relative z-10 bg-white border-b border-[#E4EAF1] px-4 sm:px-8 py-3.5 flex items-center justify-between gap-4">
         {/* Left: Brand & Receiving Facility */}
-        <div className="flex items-center gap-3">
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-teal-400 flex items-center justify-center shadow-xs">
-              <Activity className="w-4 h-4 text-white" />
+        <div className="flex items-center gap-4">
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-sky-500 to-sky-600 flex items-center justify-center shadow-xs">
+              <Activity className="w-5 h-5 text-white" />
             </div>
             <div>
-              <span className="font-mono text-sm font-black tracking-tight text-slate-900 block leading-tight">
-                TRAUMA<span className="text-sky-500">BRIDGE</span> AI
+              <span className="font-black text-base tracking-tight text-slate-900 block leading-tight">
+                Trauma<span className="text-sky-600">Bridge</span>
               </span>
-              <span className="text-[10px] text-slate-400 font-sans font-bold tracking-wider uppercase block">
-                Hospital Receiving Console
+              <span className="text-[11px] text-slate-400 font-medium tracking-wide block">
+                Hospital ED Console
               </span>
             </div>
           </Link>
 
-          <div className="hidden lg:flex items-center gap-2 pl-4 border-l border-slate-200">
-            <Building2 className="w-4 h-4 text-sky-500 flex-shrink-0" />
+          <div className="hidden lg:flex items-center gap-2.5 pl-5 border-l border-slate-200">
+            <div className="w-7 h-7 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center">
+              <Building2 className="w-4 h-4 text-sky-600 flex-shrink-0" />
+            </div>
             <div>
-              <p className="text-xs font-bold text-slate-800 leading-tight">
+              <p className="text-xs font-bold text-slate-900 leading-tight">
                 St. Bartholomew's Major Trauma Centre
               </p>
-              <p className="text-[11px] text-slate-400 font-sans">
+              <p className="text-[11px] text-slate-500 font-medium">
                 Emergency Department · Resuscitation Bays 1–4
               </p>
             </div>
           </div>
         </div>
 
-        {/* Center: Minimal Navigation Pills */}
-        <nav className="hidden md:flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/60 text-xs font-semibold text-slate-600">
+        {/* Center: Clean Workspace Section Pills */}
+        <nav className="hidden md:flex items-center gap-1 bg-[#F8FAFC] p-1 rounded-xl border border-slate-200/80 text-xs font-semibold text-slate-600">
           <a
             href="#incoming"
-            className="px-3 py-1 rounded-lg bg-white text-slate-900 shadow-xs border border-slate-200/40"
+            className="px-3.5 py-1.5 rounded-lg bg-white text-slate-900 shadow-xs border border-slate-200/60 font-bold"
           >
             Inbound Cases ({caseRailItems.length})
           </a>
           <a
             href="#active-case"
-            className="px-3 py-1 rounded-lg hover:text-slate-900 transition-colors"
+            className="px-3 py-1.5 rounded-lg hover:text-slate-900 transition-colors"
           >
             Active Case Workspace
           </a>
           <a
             href="#preparation"
-            className="px-3 py-1 rounded-lg hover:text-slate-900 transition-colors"
+            className="px-3 py-1.5 rounded-lg hover:text-slate-900 transition-colors"
           >
-            Preparation ({prepReadyCount}/{prepTotalCount})
+            Hospital Prep ({prepReadyCount}/{prepTotalCount})
           </a>
           <a
             href="#activity"
-            className="px-3 py-1 rounded-lg hover:text-slate-900 transition-colors"
+            className="px-3 py-1.5 rounded-lg hover:text-slate-900 transition-colors"
           >
             Live Activity
           </a>
@@ -251,24 +253,23 @@ export default function HospitalPage() {
 
         {/* Right: Quick actions & Link to Ambulance */}
         <div className="flex items-center gap-2.5">
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<RefreshCw className="w-3.5 h-3.5" />}
+          <button
+            type="button"
             onClick={() => loadDemoRun()}
-            className="rounded-xl text-xs font-bold border-[#E4EAF1] text-slate-600 hover:text-slate-900 hover:bg-slate-50 shadow-xs"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-white border border-[#E4EAF1] hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-xs cursor-pointer"
             title="Reload demonstration data"
           >
-            Reset Demo
-          </Button>
+            <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+            <span className="hidden sm:inline">Reset Demo</span>
+          </button>
 
           <Link
             href="/ambulance"
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 transition-colors shadow-xs"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-sky-600 text-white hover:bg-sky-700 transition-colors shadow-xs"
           >
-            <Radio className="w-3.5 h-3.5 text-sky-600" />
-            <span className="hidden sm:inline">Ambulance Terminal</span>
-            <ExternalLink className="w-3 h-3 opacity-60 ml-0.5" />
+            <Radio className="w-3.5 h-3.5" />
+            <span>Ambulance Terminal</span>
+            <ExternalLink className="w-3 h-3 opacity-70 ml-0.5" />
           </Link>
         </div>
       </header>
@@ -285,11 +286,11 @@ export default function HospitalPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Bell className="w-4 h-4 text-sky-600" />
-                <h2 className="text-xs font-black uppercase tracking-wider text-slate-700 font-mono">
+                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800">
                   Incoming Cases
                 </h2>
               </div>
-              <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
                 {caseRailItems.length} En Route
               </span>
             </div>
@@ -321,7 +322,7 @@ export default function HospitalPage() {
                 type="button"
                 onClick={() => setUrgencyFilter('all')}
                 className={cn(
-                  'px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer',
+                  'px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer',
                   urgencyFilter === 'all'
                     ? 'bg-slate-900 text-white shadow-xs'
                     : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
@@ -333,25 +334,27 @@ export default function HospitalPage() {
                 type="button"
                 onClick={() => setUrgencyFilter('critical')}
                 className={cn(
-                  'px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer',
+                  'px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5',
                   urgencyFilter === 'critical'
                     ? 'bg-rose-600 text-white shadow-xs'
                     : 'bg-white text-rose-700 border border-rose-200 hover:bg-rose-50'
                 )}
               >
-                Critical (P1)
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                <span>Critical</span>
               </button>
               <button
                 type="button"
                 onClick={() => setUrgencyFilter('urgent')}
                 className={cn(
-                  'px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer',
+                  'px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5',
                   urgencyFilter === 'urgent'
                     ? 'bg-amber-600 text-white shadow-xs'
                     : 'bg-white text-amber-700 border border-amber-200 hover:bg-amber-50'
                 )}
               >
-                Urgent (P2)
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                <span>Urgent</span>
               </button>
             </div>
           </div>
@@ -373,10 +376,10 @@ export default function HospitalPage() {
                     key={item.id}
                     onClick={() => setSelectedCaseId(item.id)}
                     className={cn(
-                      'p-3.5 rounded-2xl border transition-all cursor-pointer text-left relative shadow-xs select-none',
+                      'p-3.5 rounded-[18px] border transition-all cursor-pointer text-left relative select-none',
                       isSelected
-                        ? 'bg-[#F0F6FD] border-sky-400 ring-1 ring-sky-300 shadow-sm'
-                        : 'bg-white border-[#E4EAF1] hover:border-slate-300 hover:bg-slate-50/50'
+                        ? 'bg-[#F0F7FF] border-sky-300 shadow-xs'
+                        : 'bg-white border-[#E4EAF1] hover:border-slate-300 hover:bg-slate-50/60 shadow-xs'
                     )}
                   >
                     {/* Active Accent Indicator */}
@@ -384,25 +387,31 @@ export default function HospitalPage() {
                       <div className="absolute left-0 top-3 bottom-3 w-1 bg-sky-500 rounded-r-full" />
                     )}
 
-                    {/* Top Row: Unit, Urgency Badge, ETA */}
+                    {/* Top Row: Unit, Semantic Urgency Dot, ETA */}
                     <div className="flex items-center justify-between gap-2 mb-1.5">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-black text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/60">
+                        <span className="font-bold text-xs text-slate-900 bg-slate-100/90 px-2 py-0.5 rounded-md border border-slate-200/60">
                           {item.callsign}
                         </span>
-                        <span className={cn(
-                          'text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-full border',
-                          isItemCritical
-                            ? 'bg-rose-50 text-rose-700 border-rose-200'
-                            : 'bg-amber-50 text-amber-700 border-amber-200'
-                        )}>
-                          {item.urgencyTag}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={cn(
+                              'w-2 h-2 rounded-full',
+                              isItemCritical ? 'bg-rose-500' : 'bg-amber-500'
+                            )}
+                          />
+                          <span className={cn(
+                            'text-[11px] font-semibold',
+                            isItemCritical ? 'text-rose-700' : 'text-amber-700'
+                          )}>
+                            {item.urgency === 'critical' ? 'Critical' : 'Urgent'}
+                          </span>
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-1 font-mono text-xs font-bold text-sky-700">
+                      <div className="flex items-center gap-1 text-xs font-bold text-sky-700">
                         <Clock className="w-3 h-3 text-sky-500" />
-                        <span>{item.eta}m</span>
+                        <span className="font-mono">{item.eta} min</span>
                       </div>
                     </div>
 
@@ -417,15 +426,15 @@ export default function HospitalPage() {
                     </p>
 
                     {/* Bottom Status Row */}
-                    <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2.5 pt-2 border-t border-slate-100 font-sans">
-                      <span className="flex items-center gap-1 text-slate-500">
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2.5 pt-2 border-t border-slate-100/80">
+                      <span className="flex items-center gap-1.5 text-slate-600 font-medium">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                         <span className="capitalize">{item.status.replace('-', ' ')}</span>
                       </span>
 
                       {item.run.bloodBankRequest && item.run.bloodBankRequest.status !== 'not-requested' && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.2 rounded">
-                          <Droplets className="w-2.5 h-2.5 fill-red-500 text-red-500" />
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
+                          <Droplets className="w-2.5 h-2.5 fill-rose-500 text-rose-500" />
                           <span>Blood Req</span>
                         </span>
                       )}
@@ -443,16 +452,16 @@ export default function HospitalPage() {
           className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 space-y-6 max-w-6xl mx-auto w-full"
         >
           {/* ── 1. PATIENT HEADER & PRIMARY IDENTITY ────────────────────────── */}
-          <section className="bg-white rounded-2xl border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-4">
+          <section className="bg-white rounded-[20px] border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
               {/* Left Identity Block */}
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2.5 flex-wrap">
-                  <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                  <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
                     {currentRun.patient.name ?? `Unknown ${currentRun.patient.sex ?? 'Male'}`}
                   </h1>
                   <span className={cn(
-                    'px-2.5 py-0.5 rounded-full text-xs font-bold font-mono uppercase border',
+                    'px-2.5 py-0.5 rounded-full text-xs font-bold uppercase border',
                     isCritical
                       ? 'bg-rose-50 text-rose-700 border-rose-200'
                       : 'bg-amber-50 text-amber-700 border-amber-200'
@@ -465,9 +474,9 @@ export default function HospitalPage() {
                 </div>
 
                 <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
-                  <span>Age: <strong>~{currentRun.patient.estimatedAge ?? 38} years</strong></span>
+                  <span>Age: <strong className="text-slate-700">~{currentRun.patient.estimatedAge ?? 38} years</strong></span>
                   <span className="text-slate-300">·</span>
-                  <span>Sex: <strong className="capitalize">{currentRun.patient.sex ?? 'Male'}</strong></span>
+                  <span>Sex: <strong className="capitalize text-slate-700">{currentRun.patient.sex ?? 'Male'}</strong></span>
                   {currentRun.patient.allergies && currentRun.patient.allergies.length > 0 && (
                     <>
                       <span className="text-slate-300">·</span>
@@ -486,23 +495,23 @@ export default function HospitalPage() {
               {/* Right Transit & ETA Block */}
               <div className="flex items-center gap-4 sm:border-l sm:pl-6 border-slate-200 flex-shrink-0">
                 <div className="text-left sm:text-right">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                     Ambulance Unit
                   </span>
-                  <span className="font-mono text-base font-black text-slate-900 block">
+                  <span className="font-bold text-base text-slate-900 block">
                     {currentRun.callsign}
                   </span>
-                  <span className="text-xs text-slate-500 font-sans">
+                  <span className="text-xs text-slate-500">
                     {currentRun.crewLead ?? 'Crew En Route'}
                   </span>
                 </div>
 
                 <div className="bg-sky-50 border border-sky-200/80 rounded-2xl px-4 py-2.5 text-center min-w-[90px]">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600 font-mono block">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600 block">
                     ETA
                   </span>
                   <span className="text-2xl font-black text-sky-700 font-mono block leading-none mt-0.5">
-                    {currentRun.eta ?? 4}m
+                    {currentRun.eta ?? 4} min
                   </span>
                 </div>
               </div>
@@ -524,8 +533,8 @@ export default function HospitalPage() {
                   <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
                 )}
                 <div className="space-y-0.5">
-                  <span className="font-bold tracking-tight uppercase font-mono text-[11px] block">
-                    {isCritical ? 'CRITICAL ARRIVAL PROTOCOL' : 'URGENT RECEIVING PRE-ALERT'}
+                  <span className="font-bold tracking-tight uppercase text-[11px] block">
+                    {isCritical ? 'Critical Arrival Protocol' : 'Urgent Receiving Pre-Alert'}
                   </span>
                   <p className="font-medium text-slate-700">
                     {currentRun.incident.mechanism} — {currentRun.incident.detail || 'High-risk trauma alert. Prepare primary survey resuscitation team.'}
@@ -552,18 +561,18 @@ export default function HospitalPage() {
           </section>
 
           {/* ── 3. LATEST CLINICAL SNAPSHOT (OBSERVATIONS) ───────────────────── */}
-          <section className="bg-white rounded-2xl border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-4">
+          <section className="bg-white rounded-[20px] border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <Activity className="w-4 h-4 text-sky-600" />
-                <h2 className="text-sm font-bold text-slate-900 uppercase font-mono tracking-wider">
+                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
                   Latest Physiological Observations
                 </h2>
               </div>
 
               <div className="flex items-center gap-3">
-                <span className="text-xs text-slate-400 font-mono hidden sm:inline">
-                  Source: {latestVitals?.assessedBy ?? 'Lifepak 15 Telemetry'} · {formatRelativeMinutes(latestVitals?.timestamp)}
+                <span className="text-xs text-slate-400 hidden sm:inline">
+                  Source: {latestVitals?.assessedBy ?? 'Lifepak 15 Telemetry'} · <span className="font-mono">{formatRelativeMinutes(latestVitals?.timestamp)}</span>
                 </span>
                 <button
                   type="button"
@@ -581,11 +590,11 @@ export default function HospitalPage() {
               {/* Heart Rate */}
               <div className="bg-[#F8FAFD] rounded-xl p-3.5 border border-[#E8EFF6]">
                 <div className="flex items-center justify-between text-slate-400 mb-1">
-                  <span className="text-[11px] font-bold uppercase font-mono">Heart Rate</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wide">Heart Rate</span>
                   <Heart className="w-3.5 h-3.5 text-rose-500" />
                 </div>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-2xl sm:text-3xl font-black font-mono text-slate-900">
+                  <span className="text-2xl sm:text-3xl font-extrabold font-mono text-slate-900">
                     {latestVitals?.hr?.value ?? '112'}
                   </span>
                   <span className="text-xs text-slate-400 font-medium">bpm</span>
@@ -596,12 +605,12 @@ export default function HospitalPage() {
               {/* Blood Pressure */}
               <div className="bg-[#F8FAFD] rounded-xl p-3.5 border border-[#E8EFF6]">
                 <div className="flex items-center justify-between text-slate-400 mb-1">
-                  <span className="text-[11px] font-bold uppercase font-mono">Blood Pressure</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wide">Blood Pressure</span>
                   <Activity className="w-3.5 h-3.5 text-sky-500" />
                 </div>
                 <div className="flex items-baseline gap-0.5">
                   <span className={cn(
-                    'text-2xl sm:text-3xl font-black font-mono',
+                    'text-2xl sm:text-3xl font-extrabold font-mono',
                     (latestVitals?.sbp?.value ?? 98) < 95 ? 'text-rose-600' : 'text-slate-900'
                   )}>
                     {latestVitals?.sbp?.value ?? '98'}/{latestVitals?.dbp?.value ?? '64'}
@@ -614,11 +623,11 @@ export default function HospitalPage() {
               {/* SpO2 */}
               <div className="bg-[#F8FAFD] rounded-xl p-3.5 border border-[#E8EFF6]">
                 <div className="flex items-center justify-between text-slate-400 mb-1">
-                  <span className="text-[11px] font-bold uppercase font-mono">SpO₂</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wide">SpO₂</span>
                   <Wind className="w-3.5 h-3.5 text-teal-500" />
                 </div>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-2xl sm:text-3xl font-black font-mono text-slate-900">
+                  <span className="text-2xl sm:text-3xl font-extrabold font-mono text-slate-900">
                     {latestVitals?.spo2?.value ?? '97'}
                   </span>
                   <span className="text-xs text-slate-400 font-medium">%</span>
@@ -629,11 +638,11 @@ export default function HospitalPage() {
               {/* Respiratory Rate */}
               <div className="bg-[#F8FAFD] rounded-xl p-3.5 border border-[#E8EFF6]">
                 <div className="flex items-center justify-between text-slate-400 mb-1">
-                  <span className="text-[11px] font-bold uppercase font-mono">Resp. Rate</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wide">Resp. Rate</span>
                   <Activity className="w-3.5 h-3.5 text-amber-500" />
                 </div>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-2xl sm:text-3xl font-black font-mono text-slate-900">
+                  <span className="text-2xl sm:text-3xl font-extrabold font-mono text-slate-900">
                     {latestVitals?.rr?.value ?? '20'}
                   </span>
                   <span className="text-xs text-slate-400 font-medium">/min</span>
@@ -644,11 +653,11 @@ export default function HospitalPage() {
               {/* Glasgow Coma Scale */}
               <div className="bg-sky-50/80 rounded-xl p-3.5 border border-sky-200/80 col-span-2 sm:col-span-1">
                 <div className="flex items-center justify-between text-sky-700 mb-1">
-                  <span className="text-[11px] font-bold uppercase font-mono">GCS Score</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wide">GCS Score</span>
                   <Eye className="w-3.5 h-3.5 text-sky-600" />
                 </div>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-2xl sm:text-3xl font-black font-mono text-sky-900">
+                  <span className="text-2xl sm:text-3xl font-extrabold font-mono text-sky-900">
                     {latestVitals?.gcs?.total ?? 14}
                   </span>
                   <span className="text-xs text-sky-600 font-medium">/ 15</span>
@@ -665,9 +674,9 @@ export default function HospitalPage() {
             {/* LEFT COLUMN: Mechanism & Structured Injuries */}
             <div className="space-y-6">
               {/* Mechanism Block */}
-              <div className="bg-white rounded-2xl border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-3">
+              <div className="bg-white rounded-[20px] border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
                     Mechanism of Injury
                   </h3>
                   <span className="text-xs text-slate-400 font-mono">
@@ -683,22 +692,22 @@ export default function HospitalPage() {
                     {currentRun.incident.detail || 'High-impact collision with prolonged vehicle extrication.'}
                   </p>
                   {currentRun.incident.location && (
-                    <div className="flex items-center gap-1.5 text-xs text-slate-400 pt-1 font-mono">
-                      <MapPin className="w-3 h-3 text-slate-400" />
-                      <span>{currentRun.incident.location}</span>
+                    <div className="flex items-center gap-1.5 text-xs text-slate-400 pt-1">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                      <span className="font-mono">{currentRun.incident.location}</span>
                     </div>
                   )}
                 </div>
               </div>
 
               {/* Structured Injuries Block */}
-              <div className="bg-white rounded-2xl border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-3">
+              <div className="bg-white rounded-[20px] border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 font-mono">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
                       Documented Injuries
                     </h3>
-                    <span className="font-mono text-xs font-bold px-2 py-0.2 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                    <span className="text-xs font-bold px-2 py-0.2 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
                       {currentRun.injuries.length}
                     </span>
                   </div>
@@ -762,49 +771,49 @@ export default function HospitalPage() {
             {/* RIGHT COLUMN: Key Signs & Pre-Hospital Treatment */}
             <div className="space-y-6">
               {/* Signs / Key Observations */}
-              <div className="bg-white rounded-2xl border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-3">
+              <div className="bg-white rounded-[20px] border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
                     Key Signs & System Findings
                   </h3>
-                  <span className="text-[10px] font-mono text-slate-400">Primary Survey Summary</span>
+                  <span className="text-[11px] text-slate-400">Primary Survey Summary</span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
-                    <span className="font-bold text-slate-500 text-[10px] uppercase font-mono block">Airway</span>
-                    <span className="font-black text-slate-800 mt-0.5 block">Patent & Maintained</span>
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                    <span className="font-bold text-slate-500 text-[10px] uppercase tracking-wide block">Airway</span>
+                    <span className="font-extrabold text-slate-800 mt-0.5 block">Patent & Maintained</span>
                     <span className="text-[11px] text-slate-400 mt-0.5 block">High-flow O₂ running via NRM</span>
                   </div>
 
-                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
-                    <span className="font-bold text-slate-500 text-[10px] uppercase font-mono block">Breathing</span>
-                    <span className="font-black text-slate-800 mt-0.5 block">SpO₂ 97% · RR 20</span>
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                    <span className="font-bold text-slate-500 text-[10px] uppercase tracking-wide block">Breathing</span>
+                    <span className="font-extrabold text-slate-800 mt-0.5 block">SpO₂ 97% · RR 20</span>
                     <span className="text-[11px] text-slate-400 mt-0.5 block">Left lateral rib tenderness noted</span>
                   </div>
 
-                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
-                    <span className="font-bold text-slate-500 text-[10px] uppercase font-mono block">Circulation</span>
-                    <span className={cn('font-black mt-0.5 block', (latestVitals?.sbp?.value ?? 98) < 95 ? 'text-rose-600' : 'text-slate-800')}>
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                    <span className="font-bold text-slate-500 text-[10px] uppercase tracking-wide block">Circulation</span>
+                    <span className={cn('font-extrabold mt-0.5 block', (latestVitals?.sbp?.value ?? 98) < 95 ? 'text-rose-600' : 'text-slate-800')}>
                       BP 98/64 · HR 112 bpm
                     </span>
                     <span className="text-[11px] text-slate-400 mt-0.5 block">Pelvic binder applied for stability</span>
                   </div>
 
-                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
-                    <span className="font-bold text-slate-500 text-[10px] uppercase font-mono block">Disability / GCS</span>
-                    <span className="font-black text-slate-800 mt-0.5 block">GCS 14 / 15 (E4 V4 M6)</span>
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                    <span className="font-bold text-slate-500 text-[10px] uppercase tracking-wide block">Disability / GCS</span>
+                    <span className="font-extrabold text-slate-800 mt-0.5 block">GCS 14 / 15 (E4 V4 M6)</span>
                     <span className="text-[11px] text-slate-400 mt-0.5 block">Pupils equal, reactive to light</span>
                   </div>
                 </div>
               </div>
 
               {/* Pre-Hospital Treatment Timeline */}
-              <div className="bg-white rounded-2xl border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-3">
+              <div className="bg-white rounded-[20px] border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                   <div className="flex items-center gap-2">
                     <Stethoscope className="w-4 h-4 text-emerald-600" />
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 font-mono">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
                       Pre-Hospital Interventions ({currentRun.treatments.length})
                     </h3>
                   </div>
@@ -815,7 +824,7 @@ export default function HospitalPage() {
                   {currentRun.treatments.map((tx) => (
                     <div
                       key={tx.id}
-                      className="p-3 rounded-xl bg-[#F7FAFD] border border-[#E8EFF6] flex items-start justify-between gap-3 text-xs"
+                      className="p-3.5 rounded-xl bg-[#F7FAFD] border border-[#E8EFF6] flex items-start justify-between gap-3 text-xs"
                     >
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-2">
@@ -838,13 +847,13 @@ export default function HospitalPage() {
           {/* ── 5. HOSPITAL PREPARATION & BLOOD BANK SECTION ─────────────────── */}
           <section
             id="preparation"
-            className="bg-white rounded-2xl border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-5"
+            className="bg-white rounded-[20px] border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-5"
           >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
               <div className="space-y-0.5">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <h2 className="text-sm font-bold text-slate-900 uppercase font-mono tracking-wider">
+                  <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
                     Hospital Preparation Status
                   </h2>
                 </div>
@@ -854,7 +863,7 @@ export default function HospitalPage() {
               </div>
 
               <div className="flex items-center gap-3">
-                <span className="text-xs font-bold font-mono text-slate-700">
+                <span className="text-xs font-bold text-slate-700">
                   {prepReadyCount} of {prepTotalCount} Confirmed Ready
                 </span>
                 <div className="w-28 h-2.5 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
@@ -887,8 +896,8 @@ export default function HospitalPage() {
                   >
                     <div>
                       <span className="font-extrabold text-xs block">{item.label}</span>
-                      <span className="text-[10px] text-slate-500 block mt-0.5 font-mono">
-                        Dept: {item.team} · {formatRelativeMinutes(item.updatedAt)}
+                      <span className="text-[10px] text-slate-500 block mt-0.5">
+                        Dept: {item.team} · <span className="font-mono">{formatRelativeMinutes(item.updatedAt)}</span>
                       </span>
                     </div>
 
@@ -918,26 +927,26 @@ export default function HospitalPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Droplets className="w-4 h-4 text-rose-600 fill-rose-600" />
-                    <span className="font-black text-rose-900 uppercase font-mono tracking-wider text-[11px]">
+                    <span className="font-bold text-rose-900 uppercase tracking-wider text-[11px]">
                       Emergency Blood Products Requisition
                     </span>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full font-mono text-[10px] font-bold uppercase bg-rose-100 text-rose-800 border border-rose-300">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-rose-100 text-rose-800 border border-rose-300">
                     Status: {bloodReq?.status}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-slate-700 bg-white/80 p-3 rounded-lg border border-rose-200/60 font-sans">
                   <div>
-                    <span className="text-slate-400 block text-[10px] font-mono uppercase">Requested Product</span>
+                    <span className="text-slate-400 block text-[10px] uppercase">Requested Product</span>
                     <strong className="text-slate-900 text-xs">{bloodReq?.unitsRequested ?? 4} Units O-Negative PRBCs</strong>
                   </div>
                   <div>
-                    <span className="text-slate-400 block text-[10px] font-mono uppercase">Clinical Justification</span>
+                    <span className="text-slate-400 block text-[10px] uppercase">Clinical Justification</span>
                     <span className="text-slate-900 text-xs truncate block">{bloodReq?.clinicalJustification ?? 'Haemodynamically unstable trauma'}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block text-[10px] font-mono uppercase">Coordinating Facility</span>
+                    <span className="text-slate-400 block text-[10px] uppercase">Coordinating Facility</span>
                     <span className="text-slate-900 text-xs block">{bloodReq?.recipient ?? 'St. Bartholomew\'s MTC Blood Bank'}</span>
                   </div>
                 </div>
@@ -961,12 +970,12 @@ export default function HospitalPage() {
           {/* ── 6. LIVE CHRONOLOGICAL ACTIVITY STREAM ───────────────────────── */}
           <section
             id="activity"
-            className="bg-white rounded-2xl border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-4"
+            className="bg-white rounded-[20px] border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-4"
           >
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-sky-600" />
-                <h2 className="text-sm font-bold text-slate-900 uppercase font-mono tracking-wider">
+                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
                   Live Chronological Activity
                 </h2>
               </div>
@@ -1007,11 +1016,11 @@ export default function HospitalPage() {
           </section>
 
           {/* ── 7. MIST HANDOVER CONCISE BLOCK ──────────────────────────────── */}
-          <section className="bg-white rounded-2xl border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-4">
+          <section className="bg-white rounded-[20px] border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-sky-600" />
-                <h2 className="text-sm font-bold text-slate-900 uppercase font-mono tracking-wider">
+                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
                   Structured MIST Protocol Summary
                 </h2>
               </div>
@@ -1028,28 +1037,28 @@ export default function HospitalPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
               <div className="p-3.5 rounded-xl bg-sky-50/60 border border-sky-200/80 space-y-1">
-                <span className="font-black text-sky-700 uppercase font-mono text-[11px] block">M · Mechanism</span>
+                <span className="font-bold text-sky-800 text-[11px] block">M · Mechanism</span>
                 <p className="text-slate-700 line-clamp-3 leading-snug">
                   {currentRun.mist?.mechanism ?? currentRun.incident.mechanism}
                 </p>
               </div>
 
               <div className="p-3.5 rounded-xl bg-red-50/60 border border-red-200/80 space-y-1">
-                <span className="font-black text-red-700 uppercase font-mono text-[11px] block">I · Injuries Found</span>
+                <span className="font-bold text-red-800 text-[11px] block">I · Injuries Found</span>
                 <p className="text-slate-700 line-clamp-3 leading-snug">
                   {currentRun.mist?.injuries ?? 'Pelvic instability, right temporal scalp laceration, left lateral chest contusion'}
                 </p>
               </div>
 
               <div className="p-3.5 rounded-xl bg-amber-50/60 border border-amber-200/80 space-y-1">
-                <span className="font-black text-amber-700 uppercase font-mono text-[11px] block">S · Signs / Vitals</span>
+                <span className="font-bold text-amber-800 text-[11px] block">S · Signs / Vitals</span>
                 <p className="text-slate-700 line-clamp-3 leading-snug">
                   {currentRun.mist?.signs ?? `HR ${latestVitals?.hr?.value ?? 112} · BP ${latestVitals?.sbp?.value ?? 98}/${latestVitals?.dbp?.value ?? 64} · SpO₂ ${latestVitals?.spo2?.value ?? 97}% · GCS ${latestVitals?.gcs?.total ?? 14}`}
                 </p>
               </div>
 
               <div className="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-200/80 space-y-1">
-                <span className="font-black text-emerald-700 uppercase font-mono text-[11px] block">T · Treatment Given</span>
+                <span className="font-bold text-emerald-800 text-[11px] block">T · Treatment Given</span>
                 <p className="text-slate-700 line-clamp-3 leading-snug">
                   {currentRun.mist?.treatment ?? 'High-flow O₂ 15L, 18G IV right AC, 500ml Hartmann\'s running, SAM Pelvic Binder II'}
                 </p>
