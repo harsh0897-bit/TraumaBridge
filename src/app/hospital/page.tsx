@@ -8,14 +8,13 @@ import {
   Activity, Clock, Bell, Check, AlertTriangle, ChevronRight,
   Radio, Droplets, User, MapPin, Heart, RefreshCw, Search, X,
   Shield, CheckCircle2, AlertCircle, Stethoscope, Building2,
-  ExternalLink, ChevronDown, Thermometer, Wind, Eye, FileText,
-  Calendar, ArrowRight, CheckCircle, RotateCw, Filter, ShieldAlert,
-  Flame, Package, Car, Bed, SlidersHorizontal
+  ExternalLink, Wind, Eye, FileText, Bed, Zap, Layers,
+  ChevronDown
 } from 'lucide-react'
 import { useRunStore, initRunSync } from '@/lib/runStore'
-import { DEMO_RUN, DEMO_SECONDARY_CASE, AVAILABLE_HOSPITALS } from '@/data/demoRun'
+import { DEMO_RUN, DEMO_SECONDARY_CASE } from '@/data/demoRun'
 import type { EmergencyRun, HospitalPrep, BloodBankStatus, RunEvent, VitalObservation } from '@/types/run'
-import { Button, Badge, StatusChip } from '@/components/ui'
+import { Button } from '@/components/ui'
 import { InjuryMap } from '@/components/ambulance/InjuryMap'
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
@@ -40,7 +39,9 @@ function formatRelativeMinutes(iso?: string) {
   }
 }
 
-// ─── MAIN HOSPITAL RECEIVING CONSOLE ───────────────────────────────────────────
+type HospitalTab = 'overview' | 'clinical' | 'preparation' | 'activity'
+
+// ─── MAIN HOSPITAL APPLICATION (SINGLE SCREEN VIEWPORT) ────────────────────────
 
 export default function HospitalPage() {
   const {
@@ -49,7 +50,6 @@ export default function HospitalPage() {
     acknowledgeAlert,
     updateHospitalPrep,
     updateBloodStatus,
-    addEvent,
   } = useRunStore()
 
   // Cross-tab sync
@@ -64,8 +64,9 @@ export default function HospitalPage() {
     }
   }, [activeRun, loadDemoRun])
 
-  // Selected case state: 'primary' (activeRun ?? DEMO_RUN) vs 'secondary' (DEMO_SECONDARY_CASE)
+  // Selected case & active tab
   const [selectedCaseId, setSelectedCaseId] = useState<'primary' | 'secondary'>('primary')
+  const [activeTab, setActiveTab] = useState<HospitalTab>('overview')
   const [now, setNow] = useState(new Date())
   const [searchQuery, setSearchQuery] = useState('')
   const [urgencyFilter, setUrgencyFilter] = useState<'all' | 'critical' | 'urgent'>('all')
@@ -79,10 +80,9 @@ export default function HospitalPage() {
     return () => clearInterval(timer)
   }, [])
 
-  // Cases setup
+  // Active cases setup
   const primaryRun = activeRun ?? DEMO_RUN
   const secondaryRun = DEMO_SECONDARY_CASE
-
   const currentRun: EmergencyRun = selectedCaseId === 'secondary' ? secondaryRun : primaryRun
   const isPrimary = selectedCaseId === 'primary'
 
@@ -131,8 +131,7 @@ export default function HospitalPage() {
         id: 'primary' as const,
         run: primaryRun,
         urgency: 'critical' as const,
-        urgencyTag: 'P1 CRITICAL',
-        title: primaryRun.patient.name ?? `Unknown ${primaryRun.patient.sex ?? 'Male'} (~${primaryRun.patient.estimatedAge ?? 38}y)`,
+        title: primaryRun.patient.name ?? `Unknown · ~${primaryRun.patient.estimatedAge ?? 38}M`,
         mechanism: primaryRun.incident.mechanism ?? 'Road Traffic Collision',
         callsign: primaryRun.callsign,
         eta: primaryRun.eta ?? 4,
@@ -142,8 +141,7 @@ export default function HospitalPage() {
         id: 'secondary' as const,
         run: secondaryRun,
         urgency: 'urgent' as const,
-        urgencyTag: 'P2 URGENT',
-        title: secondaryRun.patient.name ?? 'Sarah Mitchell (52F)',
+        title: secondaryRun.patient.name ? `${secondaryRun.patient.name} · 52F` : 'Sarah Mitchell · 52F',
         mechanism: secondaryRun.incident.mechanism ?? 'Fall from Height',
         callsign: secondaryRun.callsign,
         eta: secondaryRun.eta ?? 11,
@@ -166,106 +164,75 @@ export default function HospitalPage() {
   }, [primaryRun, secondaryRun, urgencyFilter, searchQuery])
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 flex flex-col font-sans selection:bg-sky-500 selection:text-white antialiased">
-      {/* ── Subtle Ambient Background Texture ────────────────────────────── */}
-      <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,_rgba(240,246,255,0.45)_0%,_rgba(255,255,255,0)_70%)] z-0" />
-
-      {/* ── Demo Safeguards Banner ─────────────────────────────────────────── */}
-      <div className="relative z-10 bg-amber-50/80 border-b border-amber-200/60 px-4 sm:px-6 py-1.5 flex items-center justify-between text-xs text-amber-900 font-sans">
+    <div className="h-[100dvh] max-h-[100dvh] w-screen overflow-hidden bg-white text-[#111827] flex flex-col font-sans selection:bg-[#2878D7] selection:text-white antialiased">
+      {/* ── Demo Safeguards Banner (Ultra-compact 1-line) ──────────────────── */}
+      <div className="flex-shrink-0 bg-[#FFF6E4] border-b border-[#E3EAF2] px-4 sm:px-6 py-1 flex items-center justify-between text-[11px] text-[#8C5E00]">
         <div className="flex items-center gap-2">
-          <span className="bg-amber-500 text-white font-bold px-1.5 py-0.5 rounded text-[10px] tracking-wider uppercase">
-            Demo Console
+          <span className="bg-[#D99000] text-white font-bold px-1.5 py-0.2 rounded text-[9px] tracking-wider uppercase">
+            Demo Mode
           </span>
-          <span className="font-medium text-amber-800 text-[11px] hidden sm:inline">
-            Simulated hospital receiving dashboard · Synthetic clinical events · Not connected to NHS Spine
+          <span className="font-medium text-[#8C5E00] hidden sm:inline">
+            Hospital Receiving Workspace · Synthetic clinical telemetry · NHS Spine simulated
           </span>
         </div>
-        <div className="flex items-center gap-3 text-[11px] text-amber-800">
+        <div className="flex items-center gap-3 text-[11px]">
           <span className="flex items-center gap-1.5 font-medium">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-emerald-800 font-semibold">Live Telemetry Sync</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-[#19A974] animate-pulse" />
+            <span className="text-[#19A974] font-semibold">Live Telemetry Sync</span>
           </span>
-          <span className="text-amber-300">|</span>
-          <span suppressHydrationWarning className="font-mono font-medium text-slate-700">{now.toLocaleTimeString('en-GB')}</span>
+          <span className="text-[#D99000]/40">|</span>
+          <span suppressHydrationWarning className="font-mono text-slate-600 font-medium">
+            {now.toLocaleTimeString('en-GB')}
+          </span>
         </div>
       </div>
 
-      {/* ── Top Header ─────────────────────────────────────────────────────── */}
-      <header className="relative z-10 bg-white border-b border-[#E4EAF1] px-4 sm:px-8 py-3.5 flex items-center justify-between gap-4">
-        {/* Left: Brand & Receiving Facility */}
+      {/* ── Top Header (Clean, spacious, compact height) ───────────────────── */}
+      <header className="flex-shrink-0 bg-white border-b border-[#E3EAF2] px-4 sm:px-6 py-2.5 flex items-center justify-between gap-4">
+        {/* Left: Brandmark & Hospital Identity */}
         <div className="flex items-center gap-4">
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-sky-500 to-sky-600 flex items-center justify-center shadow-xs">
-              <Activity className="w-5 h-5 text-white" />
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <div className="w-8 h-8 rounded-xl bg-[#2878D7] flex items-center justify-center text-white shadow-xs">
+              <Activity className="w-4 h-4" />
             </div>
             <div>
-              <span className="font-black text-base tracking-tight text-slate-900 block leading-tight">
-                Trauma<span className="text-sky-600">Bridge</span>
+              <span className="font-extrabold text-sm tracking-tight text-[#111827] block leading-none">
+                Trauma<span className="text-[#2878D7]">Bridge</span>
               </span>
-              <span className="text-[11px] text-slate-400 font-medium tracking-wide block">
-                Hospital ED Console
+              <span className="text-[10px] text-[#64748B] font-medium tracking-wide block mt-0.5">
+                Hospital Console
               </span>
             </div>
           </Link>
 
-          <div className="hidden lg:flex items-center gap-2.5 pl-5 border-l border-slate-200">
-            <div className="w-7 h-7 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center">
-              <Building2 className="w-4 h-4 text-sky-600 flex-shrink-0" />
-            </div>
+          <div className="hidden md:flex items-center gap-2 pl-4 border-l border-[#E3EAF2]">
+            <Building2 className="w-4 h-4 text-[#2878D7] flex-shrink-0" />
             <div>
-              <p className="text-xs font-bold text-slate-900 leading-tight">
+              <p className="text-xs font-bold text-[#111827] leading-tight">
                 St. Bartholomew's Major Trauma Centre
               </p>
-              <p className="text-[11px] text-slate-500 font-medium">
-                Emergency Department · Resuscitation Bays 1–4
+              <p className="text-[10px] text-[#64748B]">
+                Resuscitation Bays 1–4 · Receiving Lead On-Duty
               </p>
             </div>
           </div>
         </div>
 
-        {/* Center: Clean Workspace Section Pills */}
-        <nav className="hidden md:flex items-center gap-1 bg-[#F8FAFC] p-1 rounded-xl border border-slate-200/80 text-xs font-semibold text-slate-600">
-          <a
-            href="#incoming"
-            className="px-3.5 py-1.5 rounded-lg bg-white text-slate-900 shadow-xs border border-slate-200/60 font-bold"
-          >
-            Inbound Cases ({caseRailItems.length})
-          </a>
-          <a
-            href="#active-case"
-            className="px-3 py-1.5 rounded-lg hover:text-slate-900 transition-colors"
-          >
-            Active Case Workspace
-          </a>
-          <a
-            href="#preparation"
-            className="px-3 py-1.5 rounded-lg hover:text-slate-900 transition-colors"
-          >
-            Hospital Prep ({prepReadyCount}/{prepTotalCount})
-          </a>
-          <a
-            href="#activity"
-            className="px-3 py-1.5 rounded-lg hover:text-slate-900 transition-colors"
-          >
-            Live Activity
-          </a>
-        </nav>
-
-        {/* Right: Quick actions & Link to Ambulance */}
-        <div className="flex items-center gap-2.5">
+        {/* Right Actions */}
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => loadDemoRun()}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-white border border-[#E4EAF1] hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-xs cursor-pointer"
-            title="Reload demonstration data"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-[#64748B] bg-white border border-[#E3EAF2] hover:bg-[#F8FBFF] hover:text-[#111827] transition-colors shadow-xs cursor-pointer"
+            title="Reload demonstration dataset"
           >
-            <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+            <RefreshCw className="w-3.5 h-3.5 text-[#64748B]" />
             <span className="hidden sm:inline">Reset Demo</span>
           </button>
 
           <Link
             href="/ambulance"
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-sky-600 text-white hover:bg-sky-700 transition-colors shadow-xs"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#2878D7] text-white hover:bg-[#1E67C0] transition-colors shadow-xs"
           >
             <Radio className="w-3.5 h-3.5" />
             <span>Ambulance Terminal</span>
@@ -274,97 +241,51 @@ export default function HospitalPage() {
         </div>
       </header>
 
-      {/* ── Main Two-Column Layout ────────────────────────────────────────── */}
-      <div className="relative z-10 flex-1 flex flex-col lg:flex-row overflow-hidden">
-        {/* ── LEFT RAIL: Incoming Cases (~340px) ───────────────────────────── */}
-        <aside
-          id="incoming"
-          className="w-full lg:w-[340px] xl:w-[360px] flex-shrink-0 bg-[#FBFDFE] border-r border-[#E4EAF1] flex flex-col"
-        >
-          {/* Rail Header */}
-          <div className="p-4 border-b border-[#E4EAF1] space-y-3">
+      {/* ── Main Application Workspace Body (100dvh, No Global Scroll) ─────── */}
+      <div className="flex-1 flex flex-row overflow-hidden min-h-0">
+        {/* ── LEFT CASE RAIL (~280px-310px, Compact Rows) ─────────────────── */}
+        <aside className="w-72 sm:w-80 flex-shrink-0 bg-white border-r border-[#E3EAF2] flex flex-col min-h-0">
+          {/* Rail Header & Search */}
+          <div className="p-3 border-b border-[#E3EAF2] space-y-2 flex-shrink-0">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Bell className="w-4 h-4 text-sky-600" />
-                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+              <div className="flex items-center gap-1.5">
+                <Bell className="w-3.5 h-3.5 text-[#2878D7]" />
+                <span className="text-xs font-bold uppercase tracking-wider text-[#111827]">
                   Incoming Cases
-                </h2>
+                </span>
               </div>
-              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#EEF5FF] text-[#2878D7]">
                 {caseRailItems.length} En Route
               </span>
             </div>
 
-            {/* Search Input */}
+            {/* Compact Search */}
             <div className="relative">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className="w-3.5 h-3.5 text-[#64748B] absolute left-2.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Search patient, unit, or mechanism..."
+                placeholder="Search unit, patient..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all shadow-xs"
+                className="w-full pl-7 pr-2.5 py-1 rounded-lg border border-[#E3EAF2] bg-[#F8FBFF] text-xs text-[#111827] placeholder-[#64748B] focus:outline-none focus:ring-1 focus:ring-[#2878D7] focus:bg-white transition-all"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[#64748B] hover:text-[#111827]"
                 >
                   <X className="w-3 h-3" />
                 </button>
               )}
             </div>
-
-            {/* Filters */}
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setUrgencyFilter('all')}
-                className={cn(
-                  'px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer',
-                  urgencyFilter === 'all'
-                    ? 'bg-slate-900 text-white shadow-xs'
-                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                )}
-              >
-                All
-              </button>
-              <button
-                type="button"
-                onClick={() => setUrgencyFilter('critical')}
-                className={cn(
-                  'px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5',
-                  urgencyFilter === 'critical'
-                    ? 'bg-rose-600 text-white shadow-xs'
-                    : 'bg-white text-rose-700 border border-rose-200 hover:bg-rose-50'
-                )}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                <span>Critical</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setUrgencyFilter('urgent')}
-                className={cn(
-                  'px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5',
-                  urgencyFilter === 'urgent'
-                    ? 'bg-amber-600 text-white shadow-xs'
-                    : 'bg-white text-amber-700 border border-amber-200 hover:bg-amber-50'
-                )}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                <span>Urgent</span>
-              </button>
-            </div>
           </div>
 
-          {/* Cases List */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          {/* Clean Case Rows (Separated by subtle dividers, no giant cards) */}
+          <div className="flex-1 overflow-y-auto divide-y divide-[#E3EAF2] min-h-0">
             {caseRailItems.length === 0 ? (
-              <div className="p-8 text-center space-y-2">
-                <p className="text-xs font-bold text-slate-500">No incoming cases match filter</p>
-                <p className="text-[11px] text-slate-400">Clear your search term or select "All".</p>
+              <div className="p-6 text-center text-xs text-[#64748B]">
+                No incoming cases match filter
               </div>
             ) : (
               caseRailItems.map((item) => {
@@ -376,65 +297,61 @@ export default function HospitalPage() {
                     key={item.id}
                     onClick={() => setSelectedCaseId(item.id)}
                     className={cn(
-                      'p-3.5 rounded-[18px] border transition-all cursor-pointer text-left relative select-none',
+                      'p-3.5 transition-colors cursor-pointer text-left relative select-none group',
                       isSelected
-                        ? 'bg-[#F0F7FF] border-sky-300 shadow-xs'
-                        : 'bg-white border-[#E4EAF1] hover:border-slate-300 hover:bg-slate-50/60 shadow-xs'
+                        ? 'bg-[#EEF5FF]'
+                        : 'bg-white hover:bg-[#F8FBFF]'
                     )}
                   >
-                    {/* Active Accent Indicator */}
+                    {/* Small left accent bar on active row */}
                     {isSelected && (
-                      <div className="absolute left-0 top-3 bottom-3 w-1 bg-sky-500 rounded-r-full" />
+                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#2878D7]" />
                     )}
 
-                    {/* Top Row: Unit, Semantic Urgency Dot, ETA */}
-                    <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-xs text-slate-900 bg-slate-100/90 px-2 py-0.5 rounded-md border border-slate-200/60">
+                    {/* Top Row: Unit, Urgency, ETA */}
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-extrabold text-xs text-[#111827]">
                           {item.callsign}
                         </span>
-                        <div className="flex items-center gap-1.5">
+                        <span className="text-[#64748B]">·</span>
+                        <div className="flex items-center gap-1">
                           <span
                             className={cn(
                               'w-2 h-2 rounded-full',
-                              isItemCritical ? 'bg-rose-500' : 'bg-amber-500'
+                              isItemCritical ? 'bg-[#D92D20]' : 'bg-[#D99000]'
                             )}
                           />
                           <span className={cn(
-                            'text-[11px] font-semibold',
-                            isItemCritical ? 'text-rose-700' : 'text-amber-700'
+                            'text-[10px] font-bold uppercase',
+                            isItemCritical ? 'text-[#D92D20]' : 'text-[#D99000]'
                           )}>
-                            {item.urgency === 'critical' ? 'Critical' : 'Urgent'}
+                            {item.urgency}
                           </span>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1 text-xs font-bold text-sky-700">
-                        <Clock className="w-3 h-3 text-sky-500" />
-                        <span className="font-mono">{item.eta} min</span>
-                      </div>
+                      <span className="font-mono text-xs font-bold text-[#2878D7]">
+                        ETA {item.eta} min
+                      </span>
                     </div>
 
                     {/* Patient Line */}
-                    <h3 className="font-bold text-sm text-slate-900 leading-snug line-clamp-1">
+                    <h3 className="font-bold text-xs text-[#111827] truncate">
                       {item.title}
                     </h3>
 
                     {/* Mechanism */}
-                    <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                    <p className="text-[11px] text-[#64748B] truncate mt-0.5">
                       {item.mechanism}
                     </p>
 
                     {/* Bottom Status Row */}
-                    <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2.5 pt-2 border-t border-slate-100/80">
-                      <span className="flex items-center gap-1.5 text-slate-600 font-medium">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                        <span className="capitalize">{item.status.replace('-', ' ')}</span>
-                      </span>
-
+                    <div className="flex items-center justify-between text-[10px] text-[#64748B] mt-1.5 pt-1 border-t border-[#E3EAF2]/60">
+                      <span className="capitalize">{item.status.replace('-', ' ')}</span>
                       {item.run.bloodBankRequest && item.run.bloodBankRequest.status !== 'not-requested' && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
-                          <Droplets className="w-2.5 h-2.5 fill-rose-500 text-rose-500" />
+                        <span className="inline-flex items-center gap-0.5 text-[#D92D20] font-bold bg-[#FFF1EF] px-1.5 py-0.2 rounded">
+                          <Droplets className="w-2.5 h-2.5 fill-[#D92D20]" />
                           <span>Blood Req</span>
                         </span>
                       )}
@@ -446,629 +363,785 @@ export default function HospitalPage() {
           </div>
         </aside>
 
-        {/* ── MAIN WORKSPACE: Active Case ───────────────────────────────────── */}
-        <main
-          id="active-case"
-          className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 space-y-6 max-w-6xl mx-auto w-full"
-        >
-          {/* ── 1. PATIENT HEADER & PRIMARY IDENTITY ────────────────────────── */}
-          <section className="bg-white rounded-[20px] border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-              {/* Left Identity Block */}
-              <div className="space-y-1.5">
+        {/* ── MAIN WORKSPACE: Active Case Workspace ────────────────────────── */}
+        <main className="flex-1 flex flex-col overflow-hidden min-h-0 bg-[#FFFFFF]">
+          {/* ── A. PERSISTENT PATIENT HEADER (Visible Across Every Tab) ─────── */}
+          <div className="flex-shrink-0 bg-white border-b border-[#E3EAF2] px-5 sm:px-7 py-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              {/* Identity & Demographics */}
+              <div className="space-y-0.5">
                 <div className="flex items-center gap-2.5 flex-wrap">
-                  <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                  <h1 className="text-xl sm:text-2xl font-black text-[#111827] tracking-tight">
                     {currentRun.patient.name ?? `Unknown ${currentRun.patient.sex ?? 'Male'}`}
                   </h1>
+
+                  {/* Urgency Badge */}
                   <span className={cn(
-                    'px-2.5 py-0.5 rounded-full text-xs font-bold uppercase border',
+                    'px-2.5 py-0.5 rounded-full text-xs font-bold uppercase',
                     isCritical
-                      ? 'bg-rose-50 text-rose-700 border-rose-200'
-                      : 'bg-amber-50 text-amber-700 border-amber-200'
+                      ? 'bg-[#FFF1EF] text-[#D92D20] border border-[#D92D20]/20'
+                      : 'bg-[#FFF6E4] text-[#D99000] border border-[#D99000]/20'
                   )}>
-                    {urgencyLabel} Arrival
+                    {urgencyLabel}
                   </span>
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200/80 capitalize">
+
+                  {/* Identity status */}
+                  <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#F8FBFF] text-[#64748B] border border-[#E3EAF2] capitalize">
                     {currentRun.patient.identityStatus.replace('-', ' ')}
                   </span>
                 </div>
 
-                <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
-                  <span>Age: <strong className="text-slate-700">~{currentRun.patient.estimatedAge ?? 38} years</strong></span>
-                  <span className="text-slate-300">·</span>
-                  <span>Sex: <strong className="capitalize text-slate-700">{currentRun.patient.sex ?? 'Male'}</strong></span>
+                <div className="flex items-center gap-2 text-xs text-[#64748B] flex-wrap">
+                  <span>Age: <strong className="text-[#111827]">~{currentRun.patient.estimatedAge ?? 38}</strong></span>
+                  <span>·</span>
+                  <span>Sex: <strong className="capitalize text-[#111827]">{currentRun.patient.sex ?? 'Male'}</strong></span>
+                  <span>·</span>
+                  <span>Unit: <strong className="text-[#111827]">{currentRun.callsign}</strong> ({currentRun.crewLead ?? 'Crew En Route'})</span>
                   {currentRun.patient.allergies && currentRun.patient.allergies.length > 0 && (
                     <>
-                      <span className="text-slate-300">·</span>
-                      <span className="text-rose-600 font-bold">
+                      <span>·</span>
+                      <span className="text-[#D92D20] font-bold">
                         Allergies: {currentRun.patient.allergies.join(', ')}
                       </span>
                     </>
                   )}
-                  <span className="text-slate-300">·</span>
-                  <span className="font-mono text-[11px] text-slate-400">
+                  <span>·</span>
+                  <span className="font-mono text-[11px] text-[#64748B]">
                     ID: #{currentRun.id.slice(0, 10)}
                   </span>
                 </div>
               </div>
 
-              {/* Right Transit & ETA Block */}
-              <div className="flex items-center gap-4 sm:border-l sm:pl-6 border-slate-200 flex-shrink-0">
-                <div className="text-left sm:text-right">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                    Ambulance Unit
+              {/* Destination, ETA & Quick Pre-Alert Action */}
+              <div className="flex items-center gap-3 sm:border-l sm:pl-5 border-[#E3EAF2] flex-shrink-0">
+                <div className="text-right">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#64748B] block">
+                    Destination
                   </span>
-                  <span className="font-bold text-base text-slate-900 block">
-                    {currentRun.callsign}
-                  </span>
-                  <span className="text-xs text-slate-500">
-                    {currentRun.crewLead ?? 'Crew En Route'}
+                  <span className="text-xs font-extrabold text-[#111827] block">
+                    Resus Bay 2
                   </span>
                 </div>
 
-                <div className="bg-sky-50 border border-sky-200/80 rounded-2xl px-4 py-2.5 text-center min-w-[90px]">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600 block">
+                <div className="bg-[#EEF5FF] border border-[#2878D7]/30 rounded-xl px-3 py-1.5 text-center min-w-[75px]">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-[#2878D7] block">
                     ETA
                   </span>
-                  <span className="text-2xl font-black text-sky-700 font-mono block leading-none mt-0.5">
+                  <span className="text-lg font-black text-[#2878D7] font-mono block leading-none mt-0.5">
                     {currentRun.eta ?? 4} min
                   </span>
                 </div>
-              </div>
-            </div>
 
-            {/* ── 2. RESTRAINED CRITICAL / URGENT ALERT BAND ──────────────────── */}
-            <div
-              className={cn(
-                'p-3.5 sm:p-4 rounded-xl border flex items-center justify-between gap-3 text-xs transition-colors',
-                isCritical
-                  ? 'bg-rose-50/80 border-rose-200 text-rose-900'
-                  : 'bg-amber-50/80 border-amber-200 text-amber-900'
-              )}
-            >
-              <div className="flex items-center gap-2.5">
-                {isCritical ? (
-                  <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                )}
-                <div className="space-y-0.5">
-                  <span className="font-bold tracking-tight uppercase text-[11px] block">
-                    {isCritical ? 'Critical Arrival Protocol' : 'Urgent Receiving Pre-Alert'}
-                  </span>
-                  <p className="font-medium text-slate-700">
-                    {currentRun.incident.mechanism} — {currentRun.incident.detail || 'High-risk trauma alert. Prepare primary survey resuscitation team.'}
-                  </p>
-                </div>
-              </div>
-
-              {currentRun.alertStatus !== 'acknowledged' ? (
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onClick={handleAcknowledge}
-                  className="rounded-xl font-bold text-xs bg-slate-900 hover:bg-slate-800 text-white flex-shrink-0 shadow-xs"
-                >
-                  Acknowledge Pre-Alert
-                </Button>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-100 text-emerald-800 font-bold text-[11px] flex-shrink-0">
-                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>Acknowledged</span>
-                </span>
-              )}
-            </div>
-          </section>
-
-          {/* ── 3. LATEST CLINICAL SNAPSHOT (OBSERVATIONS) ───────────────────── */}
-          <section className="bg-white rounded-[20px] border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <Activity className="w-4 h-4 text-sky-600" />
-                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                  Latest Physiological Observations
-                </h2>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-slate-400 hidden sm:inline">
-                  Source: {latestVitals?.assessedBy ?? 'Lifepak 15 Telemetry'} · <span className="font-mono">{formatRelativeMinutes(latestVitals?.timestamp)}</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setDrawerType('vitals-trend')}
-                  className="text-xs font-bold text-sky-600 hover:text-sky-700 hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <span>View Trend ({vitalsList.length} Readings)</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Structured Vital Readout Strips (Not 6 giant equal cards) */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-              {/* Heart Rate */}
-              <div className="bg-[#F8FAFD] rounded-xl p-3.5 border border-[#E8EFF6]">
-                <div className="flex items-center justify-between text-slate-400 mb-1">
-                  <span className="text-[11px] font-bold uppercase tracking-wide">Heart Rate</span>
-                  <Heart className="w-3.5 h-3.5 text-rose-500" />
-                </div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-2xl sm:text-3xl font-extrabold font-mono text-slate-900">
-                    {latestVitals?.hr?.value ?? '112'}
-                  </span>
-                  <span className="text-xs text-slate-400 font-medium">bpm</span>
-                </div>
-                <span className="text-[10px] text-slate-400 mt-1 block">Norm 60–100</span>
-              </div>
-
-              {/* Blood Pressure */}
-              <div className="bg-[#F8FAFD] rounded-xl p-3.5 border border-[#E8EFF6]">
-                <div className="flex items-center justify-between text-slate-400 mb-1">
-                  <span className="text-[11px] font-bold uppercase tracking-wide">Blood Pressure</span>
-                  <Activity className="w-3.5 h-3.5 text-sky-500" />
-                </div>
-                <div className="flex items-baseline gap-0.5">
-                  <span className={cn(
-                    'text-2xl sm:text-3xl font-extrabold font-mono',
-                    (latestVitals?.sbp?.value ?? 98) < 95 ? 'text-rose-600' : 'text-slate-900'
-                  )}>
-                    {latestVitals?.sbp?.value ?? '98'}/{latestVitals?.dbp?.value ?? '64'}
-                  </span>
-                  <span className="text-xs text-slate-400 font-medium ml-1">mmHg</span>
-                </div>
-                <span className="text-[10px] text-slate-400 mt-1 block">Norm 120/80</span>
-              </div>
-
-              {/* SpO2 */}
-              <div className="bg-[#F8FAFD] rounded-xl p-3.5 border border-[#E8EFF6]">
-                <div className="flex items-center justify-between text-slate-400 mb-1">
-                  <span className="text-[11px] font-bold uppercase tracking-wide">SpO₂</span>
-                  <Wind className="w-3.5 h-3.5 text-teal-500" />
-                </div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-2xl sm:text-3xl font-extrabold font-mono text-slate-900">
-                    {latestVitals?.spo2?.value ?? '97'}
-                  </span>
-                  <span className="text-xs text-slate-400 font-medium">%</span>
-                </div>
-                <span className="text-[10px] text-slate-400 mt-1 block">Norm 95–100%</span>
-              </div>
-
-              {/* Respiratory Rate */}
-              <div className="bg-[#F8FAFD] rounded-xl p-3.5 border border-[#E8EFF6]">
-                <div className="flex items-center justify-between text-slate-400 mb-1">
-                  <span className="text-[11px] font-bold uppercase tracking-wide">Resp. Rate</span>
-                  <Activity className="w-3.5 h-3.5 text-amber-500" />
-                </div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-2xl sm:text-3xl font-extrabold font-mono text-slate-900">
-                    {latestVitals?.rr?.value ?? '20'}
-                  </span>
-                  <span className="text-xs text-slate-400 font-medium">/min</span>
-                </div>
-                <span className="text-[10px] text-slate-400 mt-1 block">Norm 12–20</span>
-              </div>
-
-              {/* Glasgow Coma Scale */}
-              <div className="bg-sky-50/80 rounded-xl p-3.5 border border-sky-200/80 col-span-2 sm:col-span-1">
-                <div className="flex items-center justify-between text-sky-700 mb-1">
-                  <span className="text-[11px] font-bold uppercase tracking-wide">GCS Score</span>
-                  <Eye className="w-3.5 h-3.5 text-sky-600" />
-                </div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-2xl sm:text-3xl font-extrabold font-mono text-sky-900">
-                    {latestVitals?.gcs?.total ?? 14}
-                  </span>
-                  <span className="text-xs text-sky-600 font-medium">/ 15</span>
-                </div>
-                <span className="text-[10px] text-sky-700 mt-1 block font-mono">
-                  E{latestVitals?.gcs?.components?.eye ?? 4} V{latestVitals?.gcs?.components?.verbal ?? 4} M{latestVitals?.gcs?.components?.motor ?? 6}
-                </span>
-              </div>
-            </div>
-          </section>
-
-          {/* ── 4. CLINICAL OVERVIEW (2-COLUMN INFORMATION ARRANGEMENT) ──────── */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* LEFT COLUMN: Mechanism & Structured Injuries */}
-            <div className="space-y-6">
-              {/* Mechanism Block */}
-              <div className="bg-white rounded-[20px] border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                    Mechanism of Injury
-                  </h3>
-                  <span className="text-xs text-slate-400 font-mono">
-                    Time: {currentRun.incident.time ?? 'Scene'}
-                  </span>
-                </div>
-
-                <div className="space-y-1.5">
-                  <h4 className="text-base font-extrabold text-slate-900">
-                    {currentRun.incident.mechanism}
-                  </h4>
-                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                    {currentRun.incident.detail || 'High-impact collision with prolonged vehicle extrication.'}
-                  </p>
-                  {currentRun.incident.location && (
-                    <div className="flex items-center gap-1.5 text-xs text-slate-400 pt-1">
-                      <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                      <span className="font-mono">{currentRun.incident.location}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Structured Injuries Block */}
-              <div className="bg-white rounded-[20px] border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                      Documented Injuries
-                    </h3>
-                    <span className="text-xs font-bold px-2 py-0.2 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
-                      {currentRun.injuries.length}
-                    </span>
-                  </div>
-
+                {currentRun.alertStatus !== 'acknowledged' ? (
                   <button
                     type="button"
-                    onClick={() => setDrawerType('body-map')}
-                    className="text-xs font-bold text-sky-600 hover:text-sky-700 flex items-center gap-1 cursor-pointer"
+                    onClick={handleAcknowledge}
+                    className="px-3 py-2 rounded-xl text-xs font-bold bg-[#111827] text-white hover:bg-[#1f2937] transition-colors shadow-xs cursor-pointer"
                   >
-                    <span>Inspect 3D Body Map</span>
-                    <ChevronRight className="w-3 h-3" />
+                    Acknowledge
                   </button>
-                </div>
-
-                {currentRun.injuries.length === 0 ? (
-                  <p className="text-xs text-slate-400 py-3">No specific anatomical injuries documented.</p>
                 ) : (
-                  <div className="space-y-2.5">
-                    {currentRun.injuries.map((inj) => {
-                      const isSevere = inj.severity === 'severe' || inj.severity === 'critical'
-                      return (
-                        <div
-                          key={inj.id}
-                          className={cn(
-                            'p-3.5 rounded-xl border text-xs space-y-1 transition-colors',
-                            isSevere
-                              ? 'bg-rose-50/50 border-rose-200'
-                              : 'bg-slate-50/70 border-slate-200'
-                          )}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-black text-slate-900 capitalize">
-                              {inj.region.replace(/-/g, ' ')}
-                            </span>
-                            <span className={cn(
-                              'text-[10px] font-mono font-bold uppercase px-2 py-0.2 rounded border',
-                              isSevere
-                                ? 'bg-rose-100 text-rose-800 border-rose-200'
-                                : 'bg-slate-100 text-slate-700 border-slate-300'
-                            )}>
-                              {inj.type} · {inj.severity}
-                            </span>
-                          </div>
-                          {inj.notes && (
-                            <p className="text-xs text-slate-600 leading-snug">
-                              {inj.notes}
-                            </p>
-                          )}
-                          <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 font-mono">
-                            <span>Assessed by: {inj.assessedBy ?? 'Crew Lead'}</span>
-                            <span>{formatRelativeMinutes(inj.timestamp)}</span>
-                          </div>
-                        </div>
-                      )
-                    })}
+                  <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#ECF9F3] text-[#19A974] text-xs font-bold border border-[#19A974]/30">
+                    <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span>Pre-Alert Active</span>
                   </div>
                 )}
-              </div>
-            </div>
-
-            {/* RIGHT COLUMN: Key Signs & Pre-Hospital Treatment */}
-            <div className="space-y-6">
-              {/* Signs / Key Observations */}
-              <div className="bg-white rounded-[20px] border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                    Key Signs & System Findings
-                  </h3>
-                  <span className="text-[11px] text-slate-400">Primary Survey Summary</span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                    <span className="font-bold text-slate-500 text-[10px] uppercase tracking-wide block">Airway</span>
-                    <span className="font-extrabold text-slate-800 mt-0.5 block">Patent & Maintained</span>
-                    <span className="text-[11px] text-slate-400 mt-0.5 block">High-flow O₂ running via NRM</span>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                    <span className="font-bold text-slate-500 text-[10px] uppercase tracking-wide block">Breathing</span>
-                    <span className="font-extrabold text-slate-800 mt-0.5 block">SpO₂ 97% · RR 20</span>
-                    <span className="text-[11px] text-slate-400 mt-0.5 block">Left lateral rib tenderness noted</span>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                    <span className="font-bold text-slate-500 text-[10px] uppercase tracking-wide block">Circulation</span>
-                    <span className={cn('font-extrabold mt-0.5 block', (latestVitals?.sbp?.value ?? 98) < 95 ? 'text-rose-600' : 'text-slate-800')}>
-                      BP 98/64 · HR 112 bpm
-                    </span>
-                    <span className="text-[11px] text-slate-400 mt-0.5 block">Pelvic binder applied for stability</span>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                    <span className="font-bold text-slate-500 text-[10px] uppercase tracking-wide block">Disability / GCS</span>
-                    <span className="font-extrabold text-slate-800 mt-0.5 block">GCS 14 / 15 (E4 V4 M6)</span>
-                    <span className="text-[11px] text-slate-400 mt-0.5 block">Pupils equal, reactive to light</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Pre-Hospital Treatment Timeline */}
-              <div className="bg-white rounded-[20px] border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <Stethoscope className="w-4 h-4 text-emerald-600" />
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                      Pre-Hospital Interventions ({currentRun.treatments.length})
-                    </h3>
-                  </div>
-                  <span className="text-xs text-slate-400 font-mono">Administered en route</span>
-                </div>
-
-                <div className="space-y-2">
-                  {currentRun.treatments.map((tx) => (
-                    <div
-                      key={tx.id}
-                      className="p-3.5 rounded-xl bg-[#F7FAFD] border border-[#E8EFF6] flex items-start justify-between gap-3 text-xs"
-                    >
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                          <span className="font-bold text-slate-900">{tx.description}</span>
-                        </div>
-                        <p className="text-slate-600 text-xs pl-4">{tx.detail}</p>
-                      </div>
-
-                      <div className="text-right text-[10px] font-mono text-slate-400 flex-shrink-0">
-                        <span>{formatRelativeMinutes(tx.timestamp)}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </div>
             </div>
           </div>
 
-          {/* ── 5. HOSPITAL PREPARATION & BLOOD BANK SECTION ─────────────────── */}
-          <section
-            id="preparation"
-            className="bg-white rounded-[20px] border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-5"
-          >
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                    Hospital Preparation Status
-                  </h2>
-                </div>
-                <p className="text-xs text-slate-500">
-                  Click any department item to toggle readiness (Pending → In Progress → Ready).
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-bold text-slate-700">
-                  {prepReadyCount} of {prepTotalCount} Confirmed Ready
-                </span>
-                <div className="w-28 h-2.5 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
-                  <div
-                    className="h-full bg-emerald-500 rounded-full transition-all duration-300"
-                    style={{ width: `${prepPercent}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Preparation Cards Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {prepItems.map((item) => {
-                const isReady = item.status === 'ready'
-                const isInProgress = item.status === 'in-progress'
+          {/* ── B. CASE NAVIGATION TABS (Segmented navigation bar) ────────────── */}
+          <div className="flex-shrink-0 px-5 sm:px-7 pt-2.5 pb-2 bg-white border-b border-[#E3EAF2]">
+            <div className="flex items-center gap-2">
+              {(
+                [
+                  { id: 'overview', label: 'Overview', badge: null },
+                  { id: 'clinical', label: 'Clinical', badge: `${currentRun.injuries.length} Injuries` },
+                  { id: 'preparation', label: 'Preparation', badge: `${prepReadyCount}/${prepTotalCount} Ready` },
+                  { id: 'activity', label: 'Activity', badge: `${currentRun.events.length} Events` },
+                ] as const
+              ).map((tab) => {
+                const isActive = activeTab === tab.id
                 return (
                   <button
-                    key={item.id}
+                    key={tab.id}
                     type="button"
-                    onClick={() => cyclePrepStatus(item.id, item.status)}
+                    onClick={() => setActiveTab(tab.id)}
                     className={cn(
-                      'p-3.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-3 select-none',
-                      isReady
-                        ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
-                        : isInProgress
-                        ? 'bg-amber-50/70 border-amber-200 text-amber-950'
-                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                      'relative px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 select-none',
+                      isActive
+                        ? 'text-[#2878D7] bg-[#EEF5FF]'
+                        : 'text-[#64748B] hover:text-[#111827] hover:bg-[#F8FBFF]'
                     )}
                   >
-                    <div>
-                      <span className="font-extrabold text-xs block">{item.label}</span>
-                      <span className="text-[10px] text-slate-500 block mt-0.5">
-                        Dept: {item.team} · <span className="font-mono">{formatRelativeMinutes(item.updatedAt)}</span>
+                    <span>{tab.label}</span>
+                    {tab.badge && (
+                      <span
+                        className={cn(
+                          'text-[10px] px-1.5 py-0.2 rounded-full font-semibold',
+                          isActive
+                            ? 'bg-[#2878D7] text-white'
+                            : 'bg-[#F8FBFF] text-[#64748B] border border-[#E3EAF2]'
+                        )}
+                      >
+                        {tab.badge}
                       </span>
-                    </div>
-
-                    <div className="flex-shrink-0">
-                      {isReady ? (
-                        <span className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-bold">
-                          ✓
-                        </span>
-                      ) : isInProgress ? (
-                        <span className="w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs font-bold">
-                          ◐
-                        </span>
-                      ) : (
-                        <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold">
-                          ○
-                        </span>
-                      )}
-                    </div>
+                    )}
+                    {isActive && (
+                      <motion.div
+                        layoutId="activeTabIndicator"
+                        className="absolute inset-0 border border-[#2878D7]/30 rounded-xl pointer-events-none"
+                        transition={{ type: 'spring', bounce: 0.15, duration: 0.3 }}
+                      />
+                    )}
                   </button>
                 )
               })}
             </div>
+          </div>
 
-            {/* ── DEDICATED BLOOD BANK SUBORDINATE MODULE ───────────────────── */}
-            {hasBlood && (
-              <div className="mt-4 p-4 rounded-xl bg-rose-50/70 border border-rose-200 text-xs space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Droplets className="w-4 h-4 text-rose-600 fill-rose-600" />
-                    <span className="font-bold text-rose-900 uppercase tracking-wider text-[11px]">
-                      Emergency Blood Products Requisition
-                    </span>
-                  </div>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-rose-100 text-rose-800 border border-rose-300">
-                    Status: {bloodReq?.status}
-                  </span>
-                </div>
+          {/* ── C. TAB CONTENT CONTAINER (Single screen, controlled bounds) ──── */}
+          <div className="flex-1 overflow-hidden min-h-0 p-5 sm:p-6 bg-white">
+            <AnimatePresence mode="wait">
+              {/* ───────────────────────────────────────────────────────────── */}
+              {/* TAB 1: OVERVIEW (NO PAGE SCROLL)                              */}
+              {/* ───────────────────────────────────────────────────────────── */}
+              {activeTab === 'overview' && (
+                <motion.div
+                  key="tab-overview"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                  className="h-full flex flex-col gap-4 overflow-hidden"
+                >
+                  {/* Restrained Alert Banner (1-line) */}
+                  <div className={cn(
+                    'flex-shrink-0 px-4 py-2.5 rounded-xl border flex items-center justify-between text-xs',
+                    isCritical
+                      ? 'bg-[#FFF1EF] border-[#D92D20]/20 text-[#D92D20]'
+                      : 'bg-[#FFF6E4] border-[#D99000]/20 text-[#D99000]'
+                  )}>
+                    <div className="flex items-center gap-2">
+                      {isCritical ? (
+                        <AlertTriangle className="w-4 h-4 text-[#D92D20] flex-shrink-0" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 text-[#D99000] flex-shrink-0" />
+                      )}
+                      <span className="font-bold text-[#111827]">
+                        {currentRun.incident.mechanism}
+                      </span>
+                      <span className="text-[#64748B] hidden md:inline">
+                        — {currentRun.incident.detail || 'High impact trauma pre-alert.'}
+                      </span>
+                    </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-slate-700 bg-white/80 p-3 rounded-lg border border-rose-200/60 font-sans">
-                  <div>
-                    <span className="text-slate-400 block text-[10px] uppercase">Requested Product</span>
-                    <strong className="text-slate-900 text-xs">{bloodReq?.unitsRequested ?? 4} Units O-Negative PRBCs</strong>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px] uppercase">Clinical Justification</span>
-                    <span className="text-slate-900 text-xs truncate block">{bloodReq?.clinicalJustification ?? 'Haemodynamically unstable trauma'}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px] uppercase">Coordinating Facility</span>
-                    <span className="text-slate-900 text-xs block">{bloodReq?.recipient ?? 'St. Bartholomew\'s MTC Blood Bank'}</span>
-                  </div>
-                </div>
-
-                {isPrimary && bloodReq?.status === 'preparing' && (
-                  <div className="flex justify-end gap-2 pt-1">
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      onClick={() => updateBloodStatus('ready', { recipient: 'Bay 2 Standby' })}
-                      className="rounded-xl text-xs font-bold bg-rose-700 hover:bg-rose-800 text-white"
-                    >
-                      Confirm Blood Products Arrived in Bay 2
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
-          </section>
-
-          {/* ── 6. LIVE CHRONOLOGICAL ACTIVITY STREAM ───────────────────────── */}
-          <section
-            id="activity"
-            className="bg-white rounded-[20px] border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-4"
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-sky-600" />
-                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                  Live Chronological Activity
-                </h2>
-              </div>
-              <span className="text-xs text-slate-400 font-mono">
-                {currentRun.events.length} Recorded Events
-              </span>
-            </div>
-
-            {/* Chronological List (Newest on top) */}
-            <div className="relative pl-6 space-y-3.5 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
-              {[...currentRun.events].reverse().slice(0, 7).map((ev, i) => (
-                <div key={ev.id} className="relative text-xs space-y-0.5">
-                  {/* Timeline dot */}
-                  <span
-                    className={cn(
-                      'absolute -left-6 top-1 w-2.5 h-2.5 rounded-full border-2 bg-white',
-                      i === 0 ? 'border-sky-500 bg-sky-500' : 'border-slate-300'
-                    )}
-                  />
-
-                  <div className="flex items-center justify-between gap-3">
-                    <span className={cn('font-bold', i === 0 ? 'text-slate-900' : 'text-slate-700')}>
-                      {ev.description}
-                    </span>
-                    <span className="font-mono text-[10px] text-slate-400 flex-shrink-0">
-                      {formatClockTime(ev.timestamp)}
+                    <span className="text-[11px] font-bold uppercase font-mono">
+                      Protocol: {isCritical ? 'Primary Resus' : 'Urgent Assessment'}
                     </span>
                   </div>
 
-                  {ev.operator && (
-                    <span className="text-[10px] text-slate-400 block font-mono">
-                      Logged by {ev.operator} · {ev.source}
-                    </span>
+                  {/* 3-Column Overview Grid (Fits comfortably within viewport) */}
+                  <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0">
+                    {/* LEFT COLUMN: Latest Vitals (approx 3.8 / 12) */}
+                    <div className="lg:col-span-4 bg-white rounded-2xl border border-[#E3EAF2] p-4 flex flex-col justify-between shadow-xs">
+                      <div>
+                        <div className="flex items-center justify-between pb-2 border-b border-[#E3EAF2]">
+                          <div className="flex items-center gap-1.5">
+                            <Activity className="w-4 h-4 text-[#2878D7]" />
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-[#111827]">
+                              Latest Vitals
+                            </h3>
+                          </div>
+                          <span className="text-[10px] text-[#64748B] font-mono">
+                            {formatRelativeMinutes(latestVitals?.timestamp)}
+                          </span>
+                        </div>
+
+                        {/* Vitals Rows */}
+                        <div className="mt-3 space-y-2.5">
+                          {/* Heart Rate */}
+                          <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#F8FBFF] border border-[#E3EAF2]">
+                            <div className="flex items-center gap-2">
+                              <Heart className="w-4 h-4 text-[#D92D20]" />
+                              <div>
+                                <span className="text-xs font-bold text-[#111827] block">Heart Rate</span>
+                                <span className="text-[10px] text-[#64748B]">Norm 60–100 bpm</span>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-mono text-lg font-black text-[#111827]">
+                                {latestVitals?.hr?.value ?? 112}
+                              </span>
+                              <span className="text-[10px] text-[#64748B] ml-1">bpm</span>
+                            </div>
+                          </div>
+
+                          {/* Blood Pressure */}
+                          <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#F8FBFF] border border-[#E3EAF2]">
+                            <div className="flex items-center gap-2">
+                              <Activity className="w-4 h-4 text-[#2878D7]" />
+                              <div>
+                                <span className="text-xs font-bold text-[#111827] block">Blood Pressure</span>
+                                <span className="text-[10px] text-[#64748B]">Norm 120/80 mmHg</span>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className={cn(
+                                'font-mono text-lg font-black',
+                                (latestVitals?.sbp?.value ?? 98) < 95 ? 'text-[#D92D20]' : 'text-[#111827]'
+                              )}>
+                                {latestVitals?.sbp?.value ?? 98}/{latestVitals?.dbp?.value ?? 64}
+                              </span>
+                              <span className="text-[10px] text-[#64748B] ml-1">mmHg</span>
+                            </div>
+                          </div>
+
+                          {/* SpO2 & Resp Rate Row */}
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="p-2.5 rounded-xl bg-[#F8FBFF] border border-[#E3EAF2]">
+                              <span className="text-[10px] font-bold text-[#64748B] block">SpO₂ Oxygen</span>
+                              <div className="flex items-baseline gap-1 mt-0.5">
+                                <span className="font-mono text-base font-black text-[#111827]">
+                                  {latestVitals?.spo2?.value ?? 97}%
+                                </span>
+                                <span className="text-[10px] text-[#19A974] font-semibold">Norm</span>
+                              </div>
+                            </div>
+
+                            <div className="p-2.5 rounded-xl bg-[#F8FBFF] border border-[#E3EAF2]">
+                              <span className="text-[10px] font-bold text-[#64748B] block">Resp. Rate</span>
+                              <div className="flex items-baseline gap-1 mt-0.5">
+                                <span className="font-mono text-base font-black text-[#111827]">
+                                  {latestVitals?.rr?.value ?? 20}
+                                </span>
+                                <span className="text-[10px] text-[#64748B]">/min</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* GCS Score */}
+                          <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#EEF5FF] border border-[#2878D7]/20">
+                            <div>
+                              <span className="text-xs font-bold text-[#2878D7] block">GCS Assessment</span>
+                              <span className="text-[10px] font-mono text-[#2878D7]">
+                                E{latestVitals?.gcs?.components?.eye ?? 4} V{latestVitals?.gcs?.components?.verbal ?? 4} M{latestVitals?.gcs?.components?.motor ?? 6}
+                              </span>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-mono text-lg font-black text-[#2878D7]">
+                                {latestVitals?.gcs?.total ?? 14}
+                              </span>
+                              <span className="text-[10px] text-[#2878D7] ml-0.5">/ 15</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setDrawerType('vitals-trend')}
+                        className="mt-3 w-full py-2 rounded-xl text-xs font-bold text-[#2878D7] bg-[#EEF5FF] hover:bg-[#2878D7] hover:text-white transition-colors text-center cursor-pointer"
+                      >
+                        Inspect Vitals Trend ({vitalsList.length} Readings)
+                      </button>
+                    </div>
+
+                    {/* CENTER COLUMN: Key Clinical Findings (approx 4.8 / 12) */}
+                    <div className="lg:col-span-5 bg-white rounded-2xl border border-[#E3EAF2] p-4 flex flex-col justify-between shadow-xs">
+                      <div>
+                        <div className="flex items-center justify-between pb-2 border-b border-[#E3EAF2]">
+                          <div className="flex items-center gap-1.5">
+                            <Stethoscope className="w-4 h-4 text-[#2878D7]" />
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-[#111827]">
+                              Key Clinical Findings
+                            </h3>
+                          </div>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#FFF1EF] text-[#D92D20]">
+                            {currentRun.injuries.length} Injuries
+                          </span>
+                        </div>
+
+                        {/* Mechanism & Injury Highlights */}
+                        <div className="mt-3 space-y-2.5">
+                          {/* Incident location & detail */}
+                          <div className="p-3 rounded-xl bg-[#F8FBFF] border border-[#E3EAF2] space-y-1">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#64748B] block">
+                              Mechanism of Injury
+                            </span>
+                            <p className="text-xs font-extrabold text-[#111827] leading-snug">
+                              {currentRun.incident.mechanism}
+                            </p>
+                            <p className="text-[11px] text-[#64748B] leading-relaxed">
+                              {currentRun.incident.detail}
+                            </p>
+                          </div>
+
+                          {/* Injury List Rows */}
+                          <div className="space-y-1.5">
+                            {currentRun.injuries.slice(0, 3).map((inj) => {
+                              const isSevere = inj.severity === 'severe' || inj.severity === 'critical'
+                              return (
+                                <div
+                                  key={inj.id}
+                                  className={cn(
+                                    'p-2.5 rounded-xl border text-xs flex items-center justify-between gap-2',
+                                    isSevere
+                                      ? 'bg-[#FFF1EF] border-[#D92D20]/20'
+                                      : 'bg-[#F8FBFF] border-[#E3EAF2]'
+                                  )}
+                                >
+                                  <div>
+                                    <span className="font-extrabold text-[#111827] capitalize block">
+                                      {inj.region.replace(/-/g, ' ')} — {inj.type}
+                                    </span>
+                                    {inj.notes && (
+                                      <span className="text-[11px] text-[#64748B] line-clamp-1">
+                                        {inj.notes}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <span className={cn(
+                                    'text-[10px] font-bold uppercase px-2 py-0.5 rounded',
+                                    isSevere
+                                      ? 'bg-[#D92D20] text-white'
+                                      : 'bg-white text-[#64748B] border border-[#E3EAF2]'
+                                  )}>
+                                    {inj.severity}
+                                  </span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setDrawerType('body-map')}
+                          className="flex-1 py-2 rounded-xl text-xs font-bold text-[#2878D7] bg-[#EEF5FF] hover:bg-[#2878D7] hover:text-white transition-colors text-center cursor-pointer"
+                        >
+                          3D Injury Map
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('clinical')}
+                          className="flex-1 py-2 rounded-xl text-xs font-bold text-[#111827] bg-[#F8FBFF] border border-[#E3EAF2] hover:bg-slate-100 transition-colors text-center cursor-pointer"
+                        >
+                          All Clinical Details →
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* RIGHT COLUMN: Arrival / Preparation Summary (approx 3.2 / 12) */}
+                    <div className="lg:col-span-3 bg-white rounded-2xl border border-[#E3EAF2] p-4 flex flex-col justify-between shadow-xs">
+                      <div>
+                        <div className="flex items-center justify-between pb-2 border-b border-[#E3EAF2]">
+                          <div className="flex items-center gap-1.5">
+                            <CheckCircle2 className="w-4 h-4 text-[#19A974]" />
+                            <h3 className="text-xs font-bold uppercase tracking-wider text-[#111827]">
+                              Readiness Status
+                            </h3>
+                          </div>
+                          <span className="text-xs font-extrabold text-[#19A974]">
+                            {prepReadyCount}/{prepTotalCount}
+                          </span>
+                        </div>
+
+                        {/* Preparation Mini Checklist */}
+                        <div className="mt-3 space-y-2">
+                          <div className="p-2.5 rounded-xl bg-[#F8FBFF] border border-[#E3EAF2]">
+                            <span className="text-[10px] text-[#64748B] font-bold block uppercase">
+                              Assigned Bay
+                            </span>
+                            <span className="font-extrabold text-sm text-[#111827] block">
+                              Resus Bay 2 (Ready)
+                            </span>
+                          </div>
+
+                          <div className="p-2.5 rounded-xl bg-[#F8FBFF] border border-[#E3EAF2]">
+                            <span className="text-[10px] text-[#64748B] font-bold block uppercase">
+                              Trauma Team
+                            </span>
+                            <span className="font-extrabold text-sm text-[#111827] block">
+                              Level 1 Trauma Activated
+                            </span>
+                          </div>
+
+                          {/* Blood Bank Mini Status */}
+                          <div className={cn(
+                            'p-2.5 rounded-xl border',
+                            hasBlood
+                              ? 'bg-[#FFF1EF] border-[#D92D20]/20'
+                              : 'bg-[#F8FBFF] border-[#E3EAF2]'
+                          )}>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold uppercase text-[#D92D20]">
+                                Blood Products
+                              </span>
+                              <span className="text-[10px] font-bold text-[#D92D20] capitalize">
+                                {bloodReq?.status ?? 'None'}
+                              </span>
+                            </div>
+                            <span className="font-extrabold text-xs text-[#111827] block mt-0.5">
+                              {bloodReq?.unitsRequested ?? 4} Units O-Negative PRBCs
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('preparation')}
+                        className="mt-3 w-full py-2 rounded-xl text-xs font-bold text-[#111827] bg-[#EEF5FF] border border-[#2878D7]/20 hover:bg-[#2878D7] hover:text-white transition-colors text-center cursor-pointer"
+                      >
+                        Open Preparation Board ({prepReadyCount}/{prepTotalCount})
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* ───────────────────────────────────────────────────────────── */}
+              {/* TAB 2: CLINICAL (Controlled inner scroll)                     */}
+              {/* ───────────────────────────────────────────────────────────── */}
+              {activeTab === 'clinical' && (
+                <motion.div
+                  key="tab-clinical"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                  className="h-full overflow-y-auto pr-1 space-y-4"
+                >
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* Left: Mechanism & Structured Injuries */}
+                    <div className="space-y-4">
+                      {/* Mechanism Module */}
+                      <div className="bg-white rounded-2xl border border-[#E3EAF2] p-4 shadow-xs space-y-2">
+                        <div className="flex items-center justify-between pb-2 border-b border-[#E3EAF2]">
+                          <span className="text-xs font-bold uppercase tracking-wider text-[#64748B]">
+                            Mechanism of Injury
+                          </span>
+                          <span className="text-[11px] text-[#64748B] font-mono">
+                            Time: {currentRun.incident.time ?? 'Scene'}
+                          </span>
+                        </div>
+                        <h4 className="text-sm font-extrabold text-[#111827]">
+                          {currentRun.incident.mechanism}
+                        </h4>
+                        <p className="text-xs text-[#64748B] leading-relaxed">
+                          {currentRun.incident.detail}
+                        </p>
+                        {currentRun.incident.location && (
+                          <div className="flex items-center gap-1.5 text-xs text-[#64748B] pt-1">
+                            <MapPin className="w-3.5 h-3.5 text-[#2878D7]" />
+                            <span className="font-mono">{currentRun.incident.location}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Injuries Module */}
+                      <div className="bg-white rounded-2xl border border-[#E3EAF2] p-4 shadow-xs space-y-3">
+                        <div className="flex items-center justify-between pb-2 border-b border-[#E3EAF2]">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold uppercase tracking-wider text-[#111827]">
+                              Documented Injuries
+                            </span>
+                            <span className="text-xs font-bold px-2 py-0.2 rounded-full bg-[#FFF1EF] text-[#D92D20]">
+                              {currentRun.injuries.length}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setDrawerType('body-map')}
+                            className="text-xs font-bold text-[#2878D7] hover:underline cursor-pointer"
+                          >
+                            Open 3D Map
+                          </button>
+                        </div>
+
+                        <div className="space-y-2">
+                          {currentRun.injuries.map((inj) => (
+                            <div
+                              key={inj.id}
+                              className="p-3 rounded-xl bg-[#F8FBFF] border border-[#E3EAF2] text-xs space-y-1"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-[#111827] capitalize">
+                                  {inj.region.replace(/-/g, ' ')}
+                                </span>
+                                <span className="text-[10px] font-bold uppercase px-2 py-0.2 rounded bg-white text-[#64748B] border border-[#E3EAF2]">
+                                  {inj.type} · {inj.severity}
+                                </span>
+                              </div>
+                              {inj.notes && (
+                                <p className="text-[#64748B] leading-snug">{inj.notes}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: Treatments & Structured MIST */}
+                    <div className="space-y-4">
+                      {/* Pre-Hospital Treatments */}
+                      <div className="bg-white rounded-2xl border border-[#E3EAF2] p-4 shadow-xs space-y-3">
+                        <div className="flex items-center justify-between pb-2 border-b border-[#E3EAF2]">
+                          <span className="text-xs font-bold uppercase tracking-wider text-[#111827]">
+                            Pre-Hospital Interventions ({currentRun.treatments.length})
+                          </span>
+                          <span className="text-[10px] text-[#64748B]">Administered en route</span>
+                        </div>
+
+                        <div className="space-y-2">
+                          {currentRun.treatments.map((tx) => (
+                            <div
+                              key={tx.id}
+                              className="p-2.5 rounded-xl bg-[#F8FBFF] border border-[#E3EAF2] flex items-center justify-between text-xs"
+                            >
+                              <div>
+                                <span className="font-bold text-[#111827] block">{tx.description}</span>
+                                <span className="text-[11px] text-[#64748B]">{tx.detail}</span>
+                              </div>
+                              <span className="text-[10px] font-mono text-[#64748B]">
+                                {formatRelativeMinutes(tx.timestamp)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* MIST Protocol Summary */}
+                      <div className="bg-white rounded-2xl border border-[#E3EAF2] p-4 shadow-xs space-y-3">
+                        <div className="flex items-center justify-between pb-2 border-b border-[#E3EAF2]">
+                          <span className="text-xs font-bold uppercase tracking-wider text-[#111827]">
+                            Structured MIST Protocol
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setDrawerType('mist-full')}
+                            className="text-xs font-bold text-[#2878D7] hover:underline cursor-pointer"
+                          >
+                            Full Report
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="p-2.5 rounded-xl bg-[#EEF5FF] border border-[#2878D7]/20">
+                            <span className="font-bold text-[#2878D7] text-[10px] block">M · MECHANISM</span>
+                            <span className="text-[#111827] line-clamp-2 mt-0.5">{currentRun.mist?.mechanism ?? currentRun.incident.mechanism}</span>
+                          </div>
+
+                          <div className="p-2.5 rounded-xl bg-[#FFF1EF] border border-[#D92D20]/20">
+                            <span className="font-bold text-[#D92D20] text-[10px] block">I · INJURIES</span>
+                            <span className="text-[#111827] line-clamp-2 mt-0.5">{currentRun.mist?.injuries ?? 'Pelvis, scalp, chest'}</span>
+                          </div>
+
+                          <div className="p-2.5 rounded-xl bg-[#FFF6E4] border border-[#D99000]/20">
+                            <span className="font-bold text-[#D99000] text-[10px] block">S · SIGNS / VITALS</span>
+                            <span className="text-[#111827] line-clamp-2 mt-0.5">{currentRun.mist?.signs ?? 'BP 98/64, HR 112, SpO2 97%'}</span>
+                          </div>
+
+                          <div className="p-2.5 rounded-xl bg-[#ECF9F3] border border-[#19A974]/20">
+                            <span className="font-bold text-[#19A974] text-[10px] block">T · TREATMENT</span>
+                            <span className="text-[#111827] line-clamp-2 mt-0.5">{currentRun.mist?.treatment ?? 'O2, IV Access, Pelvic binder'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* ───────────────────────────────────────────────────────────── */}
+              {/* TAB 3: PREPARATION (ACTIONABLE BOARD, NO SCROLL)              */}
+              {/* ───────────────────────────────────────────────────────────── */}
+              {activeTab === 'preparation' && (
+                <motion.div
+                  key="tab-preparation"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                  className="h-full flex flex-col justify-between overflow-hidden"
+                >
+                  <div className="space-y-4">
+                    {/* Board Header & Progress Meter */}
+                    <div className="flex items-center justify-between pb-3 border-b border-[#E3EAF2]">
+                      <div>
+                        <h2 className="text-base font-extrabold text-[#111827]">
+                          Hospital Readiness Board
+                        </h2>
+                        <p className="text-xs text-[#64748B]">
+                          Click any department card to cycle readiness (Pending → In Progress → Ready)
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-extrabold text-[#19A974]">
+                          {prepReadyCount} / {prepTotalCount} READY
+                        </span>
+                        <div className="w-32 h-2.5 rounded-full bg-[#E3EAF2] overflow-hidden">
+                          <div
+                            className="h-full bg-[#19A974] rounded-full transition-all duration-300"
+                            style={{ width: `${prepPercent}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 6 Preparation Cards Grid (Direct Actionable Modules) */}
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3.5">
+                      {prepItems.map((item) => {
+                        const isReady = item.status === 'ready'
+                        const isInProgress = item.status === 'in-progress'
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => cyclePrepStatus(item.id, item.status)}
+                            className={cn(
+                              'p-4 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between gap-3 select-none shadow-xs',
+                              isReady
+                                ? 'bg-[#ECF9F3] border-[#19A974]/30 text-[#0F5132]'
+                                : isInProgress
+                                ? 'bg-[#FFF6E4] border-[#D99000]/30 text-[#8C5E00]'
+                                : 'bg-[#F8FBFF] border-[#E3EAF2] text-[#111827] hover:bg-slate-50'
+                            )}
+                          >
+                            <div>
+                              <span className="font-extrabold text-sm block">{item.label}</span>
+                              <span className="text-[11px] text-[#64748B] block mt-0.5">
+                                Dept: {item.team} · <span className="capitalize font-semibold">{item.status.replace('-', ' ')}</span>
+                              </span>
+                            </div>
+
+                            <div className="flex-shrink-0">
+                              {isReady ? (
+                                <span className="w-7 h-7 rounded-full bg-[#19A974] text-white flex items-center justify-center text-xs font-bold">
+                                  ✓
+                                </span>
+                              ) : isInProgress ? (
+                                <span className="w-7 h-7 rounded-full bg-[#D99000] text-white flex items-center justify-center text-xs font-bold">
+                                  ◐
+                                </span>
+                              ) : (
+                                <span className="w-7 h-7 rounded-full bg-[#E3EAF2] text-[#64748B] flex items-center justify-center text-xs font-bold">
+                                  ○
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Dedicated Emergency Blood Bank Subordinate Action */}
+                  {hasBlood && (
+                    <div className="p-4 rounded-2xl bg-[#FFF1EF] border border-[#D92D20]/20 text-xs flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-[#D92D20] text-white flex items-center justify-center flex-shrink-0">
+                          <Droplets className="w-5 h-5 fill-white" />
+                        </div>
+                        <div>
+                          <span className="font-extrabold text-sm text-[#D92D20] block">
+                            Emergency Blood Requisition: {bloodReq?.unitsRequested ?? 4} Units O-Negative PRBCs
+                          </span>
+                          <span className="text-[#64748B] text-xs">
+                            Status: <strong className="uppercase font-mono">{bloodReq?.status}</strong> · Standby recipient: Resus Bay 2
+                          </span>
+                        </div>
+                      </div>
+
+                      {isPrimary && bloodReq?.status === 'preparing' && (
+                        <button
+                          type="button"
+                          onClick={() => updateBloodStatus('ready', { recipient: 'Bay 2 Standby' })}
+                          className="px-4 py-2 rounded-xl text-xs font-bold bg-[#D92D20] text-white hover:bg-[#b02217] transition-colors shadow-xs cursor-pointer flex-shrink-0"
+                        >
+                          Confirm Blood Arrived at Bay 2
+                        </button>
+                      )}
+                    </div>
                   )}
-                </div>
-              ))}
-            </div>
-          </section>
+                </motion.div>
+              )}
 
-          {/* ── 7. MIST HANDOVER CONCISE BLOCK ──────────────────────────────── */}
-          <section className="bg-white rounded-[20px] border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-sky-600" />
-                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                  Structured MIST Protocol Summary
-                </h2>
-              </div>
+              {/* ───────────────────────────────────────────────────────────── */}
+              {/* TAB 4: ACTIVITY (Controlled inner timeline)                   */}
+              {/* ───────────────────────────────────────────────────────────── */}
+              {activeTab === 'activity' && (
+                <motion.div
+                  key="tab-activity"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                  className="h-full flex flex-col overflow-hidden"
+                >
+                  <div className="flex items-center justify-between pb-3 border-b border-[#E3EAF2] flex-shrink-0">
+                    <div>
+                      <h2 className="text-base font-extrabold text-[#111827]">
+                        Chronological Case Activity Stream
+                      </h2>
+                      <p className="text-xs text-[#64748B]">
+                        Real-time audit log of synthetic clinical events and hospital handoffs
+                      </p>
+                    </div>
+                    <span className="font-mono text-xs font-bold text-[#64748B]">
+                      {currentRun.events.length} Events Logged
+                    </span>
+                  </div>
 
-              <button
-                type="button"
-                onClick={() => setDrawerType('mist-full')}
-                className="text-xs font-bold text-sky-600 hover:text-sky-700 flex items-center gap-1 cursor-pointer"
-              >
-                <span>Open Full Signed Handover</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
+                  {/* Controlled Inner Timeline Scroll */}
+                  <div className="flex-1 overflow-y-auto min-h-0 pt-4 pl-6 relative before:absolute before:left-2 before:top-4 before:bottom-4 before:w-0.5 before:bg-[#E3EAF2]">
+                    <div className="space-y-4">
+                      {[...currentRun.events].reverse().map((ev, i) => (
+                        <div key={ev.id} className="relative text-xs">
+                          {/* Timeline dot (Newest event has strongest visual emphasis) */}
+                          <span
+                            className={cn(
+                              'absolute -left-6 top-1 rounded-full border-2 bg-white',
+                              i === 0
+                                ? 'w-3 h-3 -ml-0.5 border-[#2878D7] bg-[#2878D7]'
+                                : 'w-2.5 h-2.5 border-[#E3EAF2]'
+                            )}
+                          />
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-              <div className="p-3.5 rounded-xl bg-sky-50/60 border border-sky-200/80 space-y-1">
-                <span className="font-bold text-sky-800 text-[11px] block">M · Mechanism</span>
-                <p className="text-slate-700 line-clamp-3 leading-snug">
-                  {currentRun.mist?.mechanism ?? currentRun.incident.mechanism}
-                </p>
-              </div>
+                          <div className="flex items-center justify-between gap-4">
+                            <span className={cn(
+                              'font-bold',
+                              i === 0 ? 'text-sm text-[#111827]' : i < 3 ? 'text-xs text-[#111827]' : 'text-xs text-[#64748B]'
+                            )}>
+                              {ev.description}
+                            </span>
+                            <span className="font-mono text-[10px] text-[#64748B] flex-shrink-0">
+                              {formatClockTime(ev.timestamp)}
+                            </span>
+                          </div>
 
-              <div className="p-3.5 rounded-xl bg-red-50/60 border border-red-200/80 space-y-1">
-                <span className="font-bold text-red-800 text-[11px] block">I · Injuries Found</span>
-                <p className="text-slate-700 line-clamp-3 leading-snug">
-                  {currentRun.mist?.injuries ?? 'Pelvic instability, right temporal scalp laceration, left lateral chest contusion'}
-                </p>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-amber-50/60 border border-amber-200/80 space-y-1">
-                <span className="font-bold text-amber-800 text-[11px] block">S · Signs / Vitals</span>
-                <p className="text-slate-700 line-clamp-3 leading-snug">
-                  {currentRun.mist?.signs ?? `HR ${latestVitals?.hr?.value ?? 112} · BP ${latestVitals?.sbp?.value ?? 98}/${latestVitals?.dbp?.value ?? 64} · SpO₂ ${latestVitals?.spo2?.value ?? 97}% · GCS ${latestVitals?.gcs?.total ?? 14}`}
-                </p>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-200/80 space-y-1">
-                <span className="font-bold text-emerald-800 text-[11px] block">T · Treatment Given</span>
-                <p className="text-slate-700 line-clamp-3 leading-snug">
-                  {currentRun.mist?.treatment ?? 'High-flow O₂ 15L, 18G IV right AC, 500ml Hartmann\'s running, SAM Pelvic Binder II'}
-                </p>
-              </div>
-            </div>
-          </section>
+                          {ev.operator && (
+                            <span className="text-[11px] text-[#64748B] block mt-0.5 font-mono">
+                              Logged by {ev.operator} · {ev.source}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </main>
       </div>
 
-      {/* ── PROGRESSIVE DISCLOSURE MODALS / DRAWERS ───────────────────────── */}
+      {/* ── PROGRESSIVE DISCLOSURE MODALS / DRAWERS ─────────────────────────── */}
       <AnimatePresence>
         {drawerType !== 'none' && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
@@ -1076,37 +1149,37 @@ export default function HospitalPage() {
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.96 }}
-              className="bg-white rounded-3xl border border-[#E4EAF1] shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden text-slate-900"
+              className="bg-white rounded-3xl border border-[#E3EAF2] shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden text-[#111827]"
             >
               {/* Drawer Header */}
-              <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+              <div className="p-4 border-b border-[#E3EAF2] flex items-center justify-between">
                 <div>
-                  <h3 className="font-black text-lg text-slate-900">
+                  <h3 className="font-extrabold text-base text-[#111827]">
                     {drawerType === 'vitals-trend' && 'Physiological Vitals Trend'}
                     {drawerType === 'body-map' && 'Interactive Anatomical Body Map'}
                     {drawerType === 'mist-full' && 'Complete MIST Handover Report'}
                   </h3>
-                  <p className="text-xs text-slate-400 font-sans mt-0.5">
+                  <p className="text-xs text-[#64748B] mt-0.5">
                     Patient: {currentRun.patient.name ?? 'Unknown Male'} · Unit {currentRun.callsign}
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setDrawerType('none')}
-                  className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                  className="p-1.5 rounded-xl text-[#64748B] hover:text-[#111827] hover:bg-[#F8FBFF] transition-colors cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               {/* Drawer Content */}
-              <div className="p-6 overflow-y-auto flex-1">
+              <div className="p-5 overflow-y-auto flex-1">
                 {/* 1. Vitals Trend Table */}
                 {drawerType === 'vitals-trend' && (
                   <div className="space-y-4">
                     <table className="w-full text-left text-xs font-mono">
                       <thead>
-                        <tr className="border-b border-slate-200 text-slate-400 uppercase text-[10px]">
+                        <tr className="border-b border-[#E3EAF2] text-[#64748B] uppercase text-[10px]">
                           <th className="py-2">Time</th>
                           <th className="py-2">Source</th>
                           <th className="py-2">HR (bpm)</th>
@@ -1116,16 +1189,16 @@ export default function HospitalPage() {
                           <th className="py-2">GCS</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-[#E3EAF2]">
                         {vitalsList.map((v) => (
-                          <tr key={v.id} className="hover:bg-slate-50">
-                            <td className="py-3 font-semibold text-slate-900">{formatClockTime(v.timestamp)}</td>
-                            <td className="py-3 text-slate-500 font-sans text-xs">{v.assessedBy ?? v.source}</td>
-                            <td className="py-3 font-bold text-slate-900">{v.hr?.value ?? '—'}</td>
-                            <td className="py-3 font-bold text-slate-900">{v.sbp?.value ?? '—'}/{v.dbp?.value ?? '—'}</td>
-                            <td className="py-3 font-bold text-slate-900">{v.spo2?.value ?? '—'}%</td>
-                            <td className="py-3 font-bold text-slate-900">{v.rr?.value ?? '—'}</td>
-                            <td className="py-3 font-bold text-sky-700">{v.gcs?.total ?? '—'}/15</td>
+                          <tr key={v.id} className="hover:bg-[#F8FBFF]">
+                            <td className="py-2.5 font-semibold text-[#111827]">{formatClockTime(v.timestamp)}</td>
+                            <td className="py-2.5 text-[#64748B] font-sans text-xs">{v.assessedBy ?? v.source}</td>
+                            <td className="py-2.5 font-bold text-[#111827]">{v.hr?.value ?? '—'}</td>
+                            <td className="py-2.5 font-bold text-[#111827]">{v.sbp?.value ?? '—'}/{v.dbp?.value ?? '—'}</td>
+                            <td className="py-2.5 font-bold text-[#111827]">{v.spo2?.value ?? '—'}%</td>
+                            <td className="py-2.5 font-bold text-[#111827]">{v.rr?.value ?? '—'}</td>
+                            <td className="py-2.5 font-bold text-[#2878D7]">{v.gcs?.total ?? '—'}/15</td>
                           </tr>
                         ))}
                       </tbody>
@@ -1147,36 +1220,36 @@ export default function HospitalPage() {
 
                 {/* 3. Full MIST Protocol Modal */}
                 {drawerType === 'mist-full' && (
-                  <div className="space-y-4 text-xs font-sans">
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-                      <span className="font-mono text-xs font-bold text-sky-700 uppercase">M · Mechanism of Injury</span>
-                      <p className="text-slate-800 leading-relaxed font-mono">
+                  <div className="space-y-3 text-xs font-sans">
+                    <div className="p-3.5 rounded-xl bg-[#F8FBFF] border border-[#E3EAF2] space-y-1">
+                      <span className="font-bold text-[#2878D7] uppercase">M · Mechanism of Injury</span>
+                      <p className="text-[#111827] leading-relaxed">
                         {currentRun.mist?.mechanism ?? currentRun.incident.mechanism}
                       </p>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-                      <span className="font-mono text-xs font-bold text-red-700 uppercase">I · Injuries Found</span>
-                      <p className="text-slate-800 leading-relaxed font-mono whitespace-pre-line">
+                    <div className="p-3.5 rounded-xl bg-[#F8FBFF] border border-[#E3EAF2] space-y-1">
+                      <span className="font-bold text-[#D92D20] uppercase">I · Injuries Found</span>
+                      <p className="text-[#111827] leading-relaxed whitespace-pre-line">
                         {currentRun.mist?.injuries ?? 'Pelvic instability, scalp laceration'}
                       </p>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-                      <span className="font-mono text-xs font-bold text-amber-700 uppercase">S · Signs & Vital Readings</span>
-                      <p className="text-slate-800 leading-relaxed font-mono">
+                    <div className="p-3.5 rounded-xl bg-[#F8FBFF] border border-[#E3EAF2] space-y-1">
+                      <span className="font-bold text-[#D99000] uppercase">S · Signs & Vital Readings</span>
+                      <p className="text-[#111827] leading-relaxed">
                         {currentRun.mist?.signs ?? 'HR 112, BP 98/64, SpO2 97%, GCS 14'}
                       </p>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-                      <span className="font-mono text-xs font-bold text-emerald-700 uppercase">T · Treatment Given</span>
-                      <p className="text-slate-800 leading-relaxed font-mono whitespace-pre-line">
+                    <div className="p-3.5 rounded-xl bg-[#F8FBFF] border border-[#E3EAF2] space-y-1">
+                      <span className="font-bold text-[#19A974] uppercase">T · Treatment Given</span>
+                      <p className="text-[#111827] leading-relaxed whitespace-pre-line">
                         {currentRun.mist?.treatment ?? 'Oxygen, IV fluids, pelvic binder'}
                       </p>
                     </div>
 
-                    <div className="pt-2 flex items-center justify-between text-slate-400 font-mono text-[11px]">
+                    <div className="pt-2 flex items-center justify-between text-[#64748B] text-[11px]">
                       <span>Confirmed by: {currentRun.mist?.confirmedBy ?? 'Para. J. Chen'}</span>
                       <span>Timestamp: {formatClockTime(currentRun.mist?.confirmedAt)}</span>
                     </div>
@@ -1185,14 +1258,14 @@ export default function HospitalPage() {
               </div>
 
               {/* Drawer Footer */}
-              <div className="p-4 border-t border-slate-100 flex justify-end">
+              <div className="p-3 border-t border-[#E3EAF2] flex justify-end">
                 <Button
-                  size="md"
+                  size="sm"
                   variant="secondary"
                   onClick={() => setDrawerType('none')}
                   className="rounded-xl font-bold text-xs"
                 >
-                  Close Window
+                  Close
                 </Button>
               </div>
             </motion.div>
