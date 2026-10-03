@@ -11,12 +11,20 @@ import {
   SegmentedTabs,
   PillButton,
   Countdown,
+  AuditBadge,
 } from '@/components/shared'
+import { runClientAudit } from '@/lib/audit'
 import { Layers, RefreshCw, ExternalLink } from 'lucide-react'
 
 export default function HospitalDesignKitPage() {
   const [activeTab, setActiveTab] = useState('overview')
   const [demoCount, setDemoCount] = useState(118)
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      ;(window as any).__runAudit = runClientAudit
+    }
+  }, [])
 
   const tabOptions = [
     { id: 'overview', label: 'Overview' },
@@ -42,7 +50,7 @@ export default function HospitalDesignKitPage() {
               <h1 className="text-[15px] font-bold tracking-tight text-ink leading-tight">
                 TraumaBridge Hospital Design Kit
               </h1>
-              <span className="text-[12px] font-semibold px-2 py-0.5 rounded-pill bg-primary-soft text-primary border border-primary/20">
+              <span className="text-[12px] font-semibold px-2 py-0.5 rounded-pill bg-primary-soft text-primary-ink border border-primary/20">
                 Phase 1.1 Specification
               </span>
             </div>
@@ -303,6 +311,9 @@ export default function HospitalDesignKitPage() {
           </div>
         </Tile>
       </div>
+
+      {/* Real-time Quality Proof Engine Badge */}
+      <AuditBadge />
     </div>
   )
 }

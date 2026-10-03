@@ -15,17 +15,21 @@
   --color-tile: #FFFFFF;
   --color-border: #E3EAF2;
   --color-ink: #111827;
-  --color-ink-2: #64748B;
-  --color-primary: #2878D7;
+  --color-ink-2: #52637A;
+  --color-primary: #236DC5;
   --color-primary-soft: #EEF5FF;
+  --color-primary-ink: #155DA3;
   --color-primary-deep: #0F3F82;
   --color-hero-to: #1B5FB4;
   --color-success: #19A974;
   --color-success-soft: #ECF9F3;
+  --color-success-ink: #0D7A53;
   --color-warning: #D99000;
   --color-warning-soft: #FFF6E4;
+  --color-warning-ink: #78350F;
   --color-critical: #D92D20;
   --color-critical-soft: #FFF1EF;
+  --color-critical-ink: #991B1B;
 
   --shadow-tile: 0 1px 2px rgba(17, 24, 39, 0.04), 0 12px 28px -16px rgba(17, 24, 39, 0.12);
   --shadow-tile-hover: 0 4px 6px -1px rgba(17, 24, 39, 0.06), 0 18px 32px -16px rgba(17, 24, 39, 0.18);

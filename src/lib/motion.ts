@@ -121,6 +121,31 @@ export const tabContent: Variants = {
   },
 }
 
+// Case switch: workspace keyed by case ID, exit 120ms / enter 260ms
+export const caseSwitch: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 10,
+  },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.26,
+      ease,
+    },
+  },
+  exit: {
+    opacity: 0,
+    y: -8,
+    transition: {
+      duration: 0.12,
+      ease,
+    },
+  },
+}
+
+
 // ─── Hover Lift & Press ──────────────────────────────────────────────────────
 // Lift -2px + shadow step-up, 180ms | press scale 0.98
 export const hoverLift = {

@@ -22,19 +22,19 @@ export function StatusChip({
 }: StatusChipProps) {
   const styles: Record<StatusVariant, { chip: string; dot: string }> = {
     success: {
-      chip: 'bg-success-soft text-success border-success/20',
+      chip: 'bg-success-soft text-success-ink border-success/30',
       dot: 'bg-success',
     },
     warning: {
-      chip: 'bg-warning-soft text-warning border-warning/20',
+      chip: 'bg-warning-soft text-warning-ink border-warning/30',
       dot: 'bg-warning',
     },
     critical: {
-      chip: 'bg-critical-soft text-critical border-critical/20',
+      chip: 'bg-critical-soft text-critical-ink border-critical/30',
       dot: 'bg-critical',
     },
     info: {
-      chip: 'bg-primary-soft text-primary border-primary/20',
+      chip: 'bg-primary-soft text-primary-ink border-primary/30',
       dot: 'bg-primary',
     },
     neutral: {
