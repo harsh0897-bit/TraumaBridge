@@ -6,19 +6,41 @@ import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import {
   Activity, Clock, Bell, Check, AlertTriangle, ChevronRight,
-  Radio, Layers, Droplets, User, ArrowLeft, MapPin, Heart,
-  RefreshCw, Filter, Search, X, Shield, Send, CheckCircle2,
-  AlertCircle, FileText, Stethoscope, Bed, Phone, ExternalLink,
-  ChevronDown, HelpCircle, Thermometer, Wind, Eye
+  Radio, Droplets, User, MapPin, Heart, RefreshCw, Search, X,
+  Shield, CheckCircle2, AlertCircle, Stethoscope, Building2,
+  ExternalLink, ChevronDown, Thermometer, Wind, Eye, FileText,
+  Calendar, ArrowRight, CheckCircle, RotateCw, Filter, ShieldAlert,
+  Flame, Package, Car, Bed, SlidersHorizontal
 } from 'lucide-react'
 import { useRunStore, initRunSync } from '@/lib/runStore'
 import { DEMO_RUN, DEMO_SECONDARY_CASE, AVAILABLE_HOSPITALS } from '@/data/demoRun'
-import type { EmergencyRun, HospitalPrep, BloodBankStatus, RunEvent } from '@/types/run'
-import { Button, Input, Textarea, Card, Badge, StatusChip } from '@/components/ui'
+import type { EmergencyRun, HospitalPrep, BloodBankStatus, RunEvent, VitalObservation } from '@/types/run'
+import { Button, Badge, StatusChip } from '@/components/ui'
+import { InjuryMap } from '@/components/ambulance/InjuryMap'
 
-// ─── Tabs ─────────────────────────────────────────────────────────────────────
+// ─── Formatters ───────────────────────────────────────────────────────────────
 
-type HospitalTab = 'overview' | 'mist' | 'prep' | 'blood' | 'timeline'
+function formatClockTime(iso?: string) {
+  if (!iso) return '—'
+  try {
+    return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return iso
+  }
+}
+
+function formatRelativeMinutes(iso?: string) {
+  if (!iso) return '—'
+  try {
+    const diff = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000))
+    if (diff === 0) return 'Just now'
+    return `${diff}m ago`
+  } catch {
+    return iso
+  }
+}
+
+// ─── MAIN HOSPITAL RECEIVING CONSOLE ───────────────────────────────────────────
 
 export default function HospitalPage() {
   const {
@@ -35,7 +57,7 @@ export default function HospitalPage() {
     initRunSync()
   }, [])
 
-  // Auto-load demo if no run exists
+  // Auto-load demo if no active run
   useEffect(() => {
     if (!activeRun) {
       loadDemoRun()
@@ -43,179 +65,290 @@ export default function HospitalPage() {
   }, [activeRun, loadDemoRun])
 
   // Selected case state: 'primary' (activeRun ?? DEMO_RUN) vs 'secondary' (DEMO_SECONDARY_CASE)
-  const [selectedCaseId, setSelectedCaseId] = useState<string>('primary')
-  const [activeTab, setActiveTab] = useState<HospitalTab>('overview')
+  const [selectedCaseId, setSelectedCaseId] = useState<'primary' | 'secondary'>('primary')
   const [now, setNow] = useState(new Date())
   const [searchQuery, setSearchQuery] = useState('')
-  const [severityFilter, setSeverityFilter] = useState<'all' | 'critical' | 'urgent'>('all')
+  const [urgencyFilter, setUrgencyFilter] = useState<'all' | 'critical' | 'urgent'>('all')
 
-  // Clarification form state
-  const [showClarificationInput, setShowClarificationInput] = useState(false)
-  const [clarificationText, setClarificationText] = useState('')
+  // Progressive disclosure modal/drawer state
+  const [drawerType, setDrawerType] = useState<'none' | 'vitals-trend' | 'body-map' | 'mist-full'>('none')
 
-  // New ED note form state
-  const [showAddNote, setShowAddNote] = useState(false)
-  const [newNoteText, setNewNoteText] = useState('')
-
-  // Live timer
+  // Live timer tick
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(timer)
   }, [])
 
-  // Current primary run
+  // Cases setup
   const primaryRun = activeRun ?? DEMO_RUN
   const secondaryRun = DEMO_SECONDARY_CASE
 
-  // Active displayed run
   const currentRun: EmergencyRun = selectedCaseId === 'secondary' ? secondaryRun : primaryRun
-  const isPrimary = selectedCaseId !== 'secondary'
+  const isPrimary = selectedCaseId === 'primary'
 
-  // Format timestamps
-  const formatTime = (iso?: string) => {
-    if (!iso) return '—'
-    try {
-      return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-    } catch {
-      return iso
+  // Severity derivation
+  const isCritical = currentRun.id === 'demo-run-001' || (currentRun.vitalObservations?.[currentRun.vitalObservations.length - 1]?.sbp?.value ?? 120) < 95
+  const urgencyLabel = isCritical ? 'Critical' : 'Urgent'
+
+  // Latest observation
+  const vitalsList = currentRun.vitalObservations ?? []
+  const latestVitals: VitalObservation | undefined = vitalsList[vitalsList.length - 1]
+
+  // Preparation summary
+  const prepItems = currentRun.hospitalPrep ?? []
+  const prepReadyCount = prepItems.filter((p) => p.status === 'ready').length
+  const prepTotalCount = prepItems.length
+  const prepPercent = prepTotalCount > 0 ? Math.round((prepReadyCount / prepTotalCount) * 100) : 0
+
+  // Blood bank state
+  const bloodReq = currentRun.bloodBankRequest
+  const hasBlood = !!bloodReq && bloodReq.status !== 'not-requested'
+
+  // Acknowledgment handler
+  const handleAcknowledge = () => {
+    if (isPrimary && currentRun.alertStatus !== 'acknowledged') {
+      acknowledgeAlert('ED Trauma Lead — St. Bartholomew\'s')
     }
   }
 
-  const formatShortTime = (iso?: string) => {
-    if (!iso) return '—'
-    try {
-      return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-    } catch {
-      return iso
+  // Prep item status cycle
+  const cyclePrepStatus = (itemId: string, currentStatus: HospitalPrep['status']) => {
+    if (!isPrimary) return
+    const nextStatusMap: Record<HospitalPrep['status'], HospitalPrep['status']> = {
+      'pending': 'in-progress',
+      'in-progress': 'ready',
+      'ready': 'pending',
+      'unavailable': 'pending',
     }
+    const next = nextStatusMap[currentStatus] ?? 'ready'
+    updateHospitalPrep(itemId, next, 'ED Receiving Staff')
   }
 
-  // Hospital prep counters
-  const prepReadyCount = currentRun.hospitalPrep.filter((p) => p.status === 'ready').length
-  const prepTotalCount = currentRun.hospitalPrep.length
+  // Filter cases for the left rail
+  const caseRailItems = useMemo(() => {
+    const list = [
+      {
+        id: 'primary' as const,
+        run: primaryRun,
+        urgency: 'critical' as const,
+        urgencyTag: 'P1 CRITICAL',
+        title: primaryRun.patient.name ?? `Unknown ${primaryRun.patient.sex ?? 'Male'} (~${primaryRun.patient.estimatedAge ?? 38}y)`,
+        mechanism: primaryRun.incident.mechanism ?? 'Road Traffic Collision',
+        callsign: primaryRun.callsign,
+        eta: primaryRun.eta ?? 4,
+        status: primaryRun.alertStatus,
+      },
+      {
+        id: 'secondary' as const,
+        run: secondaryRun,
+        urgency: 'urgent' as const,
+        urgencyTag: 'P2 URGENT',
+        title: secondaryRun.patient.name ?? 'Sarah Mitchell (52F)',
+        mechanism: secondaryRun.incident.mechanism ?? 'Fall from Height',
+        callsign: secondaryRun.callsign,
+        eta: secondaryRun.eta ?? 11,
+        status: secondaryRun.alertStatus,
+      },
+    ]
 
-  // Blood bank status helper
-  const bloodStatus = currentRun.bloodBankRequest?.status ?? 'not-requested'
+    return list.filter((item) => {
+      if (urgencyFilter === 'critical' && item.urgency !== 'critical') return false
+      if (urgencyFilter === 'urgent' && item.urgency !== 'urgent') return false
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase()
+        const matchTitle = item.title.toLowerCase().includes(q)
+        const matchCallsign = item.callsign.toLowerCase().includes(q)
+        const matchMech = item.mechanism.toLowerCase().includes(q)
+        return matchTitle || matchCallsign || matchMech
+      }
+      return true
+    })
+  }, [primaryRun, secondaryRun, urgencyFilter, searchQuery])
 
   return (
-    <div className="min-h-screen bg-[#0A1120] text-slate-100 flex flex-col font-sans selection:bg-sky-500 selection:text-white">
+    <div className="min-h-screen bg-white text-slate-900 flex flex-col font-sans selection:bg-sky-500 selection:text-white antialiased">
+      {/* ── Subtle Ambient Background Texture ────────────────────────────── */}
+      <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,_rgba(240,246,255,0.45)_0%,_rgba(255,255,255,0)_70%)] z-0" />
+
       {/* ── Demo Safeguards Banner ─────────────────────────────────────────── */}
-      <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-1.5 flex items-center justify-between text-xs text-amber-400 font-mono">
+      <div className="relative z-10 bg-amber-50/90 border-b border-amber-200/80 px-4 sm:px-6 py-2 flex items-center justify-between text-xs text-amber-900 font-sans">
         <div className="flex items-center gap-2">
-          <span className="bg-amber-500 text-slate-950 font-bold px-1.5 py-0.2 rounded text-[10px]">DEMO CONSOLE</span>
-          <span>Simulated hospital receiving dashboard · Synthetic clinical events · Not connected to NHS Spine or live telemetry</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-[11px] text-emerald-400">Live Sync (BroadcastChannel)</span>
+          <span className="bg-amber-500 text-white font-black px-1.5 py-0.5 rounded text-[10px] font-mono tracking-wider">
+            DEMO RECEIVING CONSOLE
           </span>
-          <span className="hidden sm:inline text-slate-500">|</span>
-          <span className="hidden sm:inline">{now.toLocaleTimeString('en-GB')}</span>
+          <span className="font-medium text-amber-800 hidden sm:inline">
+            Simulated hospital receiving dashboard · Synthetic clinical events · Not connected to live NHS Spine
+          </span>
+        </div>
+        <div className="flex items-center gap-3 font-mono text-[11px] text-amber-800">
+          <span className="flex items-center gap-1.5 font-bold">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Telemetry Stream Live</span>
+          </span>
+          <span className="text-amber-300">|</span>
+          <span className="font-semibold">{now.toLocaleTimeString('en-GB')}</span>
         </div>
       </div>
 
       {/* ── Top Header ─────────────────────────────────────────────────────── */}
-      <header className="bg-[#0F1E36] border-b border-[#1E3A5F] px-4 py-3 flex items-center justify-between gap-4">
+      <header className="relative z-10 bg-white border-b border-[#E4EAF1] px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+        {/* Left: Brand & Receiving Facility */}
         <div className="flex items-center gap-3">
-          <Link href="/" className="flex items-center gap-2 group">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-teal-400 flex items-center justify-center shadow-lg shadow-sky-500/20">
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-teal-400 flex items-center justify-center shadow-xs">
               <Activity className="w-4 h-4 text-white" />
             </div>
             <div>
-              <span className="font-mono text-sm font-bold tracking-tight text-white block leading-none">
-                TRAUMA<span className="text-sky-400">BRIDGE</span>
+              <span className="font-mono text-sm font-black tracking-tight text-slate-900 block leading-tight">
+                TRAUMA<span className="text-sky-500">BRIDGE</span> AI
               </span>
-              <span className="font-mono text-[9px] text-slate-400 tracking-wider uppercase block mt-0.5">
-                Hospital ED Console
+              <span className="text-[10px] text-slate-400 font-sans font-bold tracking-wider uppercase block">
+                Hospital Receiving Console
               </span>
             </div>
           </Link>
 
-          <div className="hidden md:flex items-center gap-2 pl-4 border-l border-[#1E3A5F]">
-            <div className="w-2 h-2 rounded-full bg-emerald-500" />
+          <div className="hidden lg:flex items-center gap-2 pl-4 border-l border-slate-200">
+            <Building2 className="w-4 h-4 text-sky-500 flex-shrink-0" />
             <div>
-              <p className="text-xs font-semibold text-slate-200 leading-none">
+              <p className="text-xs font-bold text-slate-800 leading-tight">
                 St. Bartholomew's Major Trauma Centre
               </p>
-              <p className="font-mono text-[10px] text-slate-400 mt-0.5">
-                Resus Bay 1–4 · London EC1A 7BE
+              <p className="text-[11px] text-slate-400 font-sans">
+                Emergency Department · Resuscitation Bays 1–4
               </p>
             </div>
           </div>
         </div>
 
-        {/* Global Controls & Ambulance Switcher */}
+        {/* Center: Minimal Navigation Pills */}
+        <nav className="hidden md:flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/60 text-xs font-semibold text-slate-600">
+          <a
+            href="#incoming"
+            className="px-3 py-1 rounded-lg bg-white text-slate-900 shadow-xs border border-slate-200/40"
+          >
+            Inbound Cases ({caseRailItems.length})
+          </a>
+          <a
+            href="#active-case"
+            className="px-3 py-1 rounded-lg hover:text-slate-900 transition-colors"
+          >
+            Active Case Workspace
+          </a>
+          <a
+            href="#preparation"
+            className="px-3 py-1 rounded-lg hover:text-slate-900 transition-colors"
+          >
+            Preparation ({prepReadyCount}/{prepTotalCount})
+          </a>
+          <a
+            href="#activity"
+            className="px-3 py-1 rounded-lg hover:text-slate-900 transition-colors"
+          >
+            Live Activity
+          </a>
+        </nav>
+
+        {/* Right: Quick actions & Link to Ambulance */}
         <div className="flex items-center gap-2.5">
           <Button
             variant="secondary"
             size="sm"
             icon={<RefreshCw className="w-3.5 h-3.5" />}
             onClick={() => loadDemoRun()}
-            className="text-xs bg-[#162A4A] border-[#22426E] text-slate-300 hover:text-white"
-            title="Reset demonstration data"
+            className="rounded-xl text-xs font-bold border-[#E4EAF1] text-slate-600 hover:text-slate-900 hover:bg-slate-50 shadow-xs"
+            title="Reload demonstration data"
           >
-            Reset Demo Run
+            Reset Demo
           </Button>
 
           <Link
             href="/ambulance"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-500/15 border border-sky-500/30 text-sky-400 hover:bg-sky-500/25 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 transition-colors shadow-xs"
           >
-            <Radio className="w-3.5 h-3.5 animate-pulse" />
-            <span>Open Ambulance Terminal</span>
-            <ExternalLink className="w-3 h-3 ml-0.5 opacity-70" />
+            <Radio className="w-3.5 h-3.5 text-sky-600" />
+            <span className="hidden sm:inline">Ambulance Terminal</span>
+            <ExternalLink className="w-3 h-3 opacity-60 ml-0.5" />
           </Link>
         </div>
       </header>
 
-      {/* ── Main Layout: Sidebar Inbound Cases + Case Workspace ────────────── */}
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        {/* ── LEFT: Incoming Cases Rail (320px - 380px) ────────────────────── */}
-        <aside className="w-full lg:w-[360px] xl:w-[380px] flex-shrink-0 bg-[#0C172B] border-r border-[#1E3A5F] flex flex-col">
+      {/* ── Main Two-Column Layout ────────────────────────────────────────── */}
+      <div className="relative z-10 flex-1 flex flex-col lg:flex-row overflow-hidden">
+        {/* ── LEFT RAIL: Incoming Cases (~340px) ───────────────────────────── */}
+        <aside
+          id="incoming"
+          className="w-full lg:w-[340px] xl:w-[360px] flex-shrink-0 bg-[#FBFDFE] border-r border-[#E4EAF1] flex flex-col"
+        >
           {/* Rail Header */}
-          <div className="p-4 border-b border-[#1E3A5F]">
-            <div className="flex items-center justify-between mb-3">
+          <div className="p-4 border-b border-[#E4EAF1] space-y-3">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Bell className="w-4 h-4 text-sky-400" />
-                <h2 className="font-semibold text-sm text-white">Inbound Emergency Cases</h2>
+                <Bell className="w-4 h-4 text-sky-600" />
+                <h2 className="text-xs font-black uppercase tracking-wider text-slate-700 font-mono">
+                  Incoming Cases
+                </h2>
               </div>
-              <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/30">
-                2 Active
+              <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
+                {caseRailItems.length} En Route
               </span>
             </div>
 
-            {/* Filter Chips */}
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search patient, unit, or mechanism..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all shadow-xs"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            {/* Filters */}
             <div className="flex items-center gap-1.5">
               <button
-                onClick={() => setSeverityFilter('all')}
+                type="button"
+                onClick={() => setUrgencyFilter('all')}
                 className={cn(
-                  'px-2.5 py-1 rounded-md text-xs font-medium transition-colors',
-                  severityFilter === 'all'
-                    ? 'bg-sky-500 text-white'
-                    : 'bg-[#16263F] text-slate-400 hover:text-slate-200'
+                  'px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer',
+                  urgencyFilter === 'all'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
                 )}
               >
-                All (2)
+                All
               </button>
               <button
-                onClick={() => setSeverityFilter('critical')}
+                type="button"
+                onClick={() => setUrgencyFilter('critical')}
                 className={cn(
-                  'px-2.5 py-1 rounded-md text-xs font-medium transition-colors',
-                  severityFilter === 'critical'
-                    ? 'bg-red-500 text-white'
-                    : 'bg-[#16263F] text-slate-400 hover:text-slate-200'
+                  'px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer',
+                  urgencyFilter === 'critical'
+                    ? 'bg-rose-600 text-white shadow-xs'
+                    : 'bg-white text-rose-700 border border-rose-200 hover:bg-rose-50'
                 )}
               >
                 Critical (P1)
               </button>
               <button
-                onClick={() => setSeverityFilter('urgent')}
+                type="button"
+                onClick={() => setUrgencyFilter('urgent')}
                 className={cn(
-                  'px-2.5 py-1 rounded-md text-xs font-medium transition-colors',
-                  severityFilter === 'urgent'
-                    ? 'bg-amber-500 text-white'
-                    : 'bg-[#16263F] text-slate-400 hover:text-slate-200'
+                  'px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer',
+                  urgencyFilter === 'urgent'
+                    ? 'bg-amber-600 text-white shadow-xs'
+                    : 'bg-white text-amber-700 border border-amber-200 hover:bg-amber-50'
                 )}
               >
                 Urgent (P2)
@@ -223,1096 +356,840 @@ export default function HospitalPage() {
             </div>
           </div>
 
-          {/* Inbound Cases List */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
-            {/* 1. Primary Synced Case (Alpha 7) */}
-            {(severityFilter === 'all' || severityFilter === 'critical') && (
-              <div
-                onClick={() => setSelectedCaseId('primary')}
-                className={cn(
-                  'p-3.5 rounded-xl border transition-all cursor-pointer relative',
-                  selectedCaseId === 'primary'
-                    ? 'bg-[#152744] border-sky-500 shadow-md shadow-sky-500/10'
-                    : 'bg-[#101D33] border-[#1D3557] hover:border-slate-600'
-                )}
-              >
-                {selectedCaseId === 'primary' && (
-                  <div className="absolute left-0 top-3 bottom-3 w-1 bg-sky-400 rounded-r" />
-                )}
+          {/* Cases List */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {caseRailItems.length === 0 ? (
+              <div className="p-8 text-center space-y-2">
+                <p className="text-xs font-bold text-slate-500">No incoming cases match filter</p>
+                <p className="text-[11px] text-slate-400">Clear your search term or select "All".</p>
+              </div>
+            ) : (
+              caseRailItems.map((item) => {
+                const isSelected = selectedCaseId === item.id
+                const isItemCritical = item.urgency === 'critical'
 
-                <div className="flex items-start justify-between gap-2 mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-bold text-sm text-white">
-                      {primaryRun.callsign}
-                    </span>
-                    <span className="font-mono text-[10px] text-slate-400">
-                      #{primaryRun.id.slice(0, 12)}
-                    </span>
-                  </div>
-                  <Badge variant="red" size="sm" className="bg-red-500/20 text-red-400 border border-red-500/30">
-                    P1 CRITICAL
-                  </Badge>
-                </div>
-
-                <p className="text-xs font-semibold text-slate-200 mb-1">
-                  {primaryRun.patient.name ?? `Unknown ${primaryRun.patient.sex ?? 'Male'}, ~${primaryRun.patient.estimatedAge ?? 38}y`}
-                </p>
-
-                <p className="text-xs text-slate-400 line-clamp-1 mb-2.5">
-                  {primaryRun.incident.mechanism ?? 'Road Traffic Collision'}
-                </p>
-
-                <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 pt-2 border-t border-[#1C3252]">
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="w-3 h-3 text-sky-400" />
-                    <span>ETA: <strong className="text-white">{primaryRun.eta ?? 4} min</strong></span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <StatusChip status={primaryRun.alertStatus} size="sm" />
-                    {primaryRun.bloodBankRequest && (
-                      <span className="w-2 h-2 rounded-full bg-red-500" title="Blood requested" />
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => setSelectedCaseId(item.id)}
+                    className={cn(
+                      'p-3.5 rounded-2xl border transition-all cursor-pointer text-left relative shadow-xs select-none',
+                      isSelected
+                        ? 'bg-[#F0F6FD] border-sky-400 ring-1 ring-sky-300 shadow-sm'
+                        : 'bg-white border-[#E4EAF1] hover:border-slate-300 hover:bg-slate-50/50'
                     )}
+                  >
+                    {/* Active Accent Indicator */}
+                    {isSelected && (
+                      <div className="absolute left-0 top-3 bottom-3 w-1 bg-sky-500 rounded-r-full" />
+                    )}
+
+                    {/* Top Row: Unit, Urgency Badge, ETA */}
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-black text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/60">
+                          {item.callsign}
+                        </span>
+                        <span className={cn(
+                          'text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-full border',
+                          isItemCritical
+                            ? 'bg-rose-50 text-rose-700 border-rose-200'
+                            : 'bg-amber-50 text-amber-700 border-amber-200'
+                        )}>
+                          {item.urgencyTag}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1 font-mono text-xs font-bold text-sky-700">
+                        <Clock className="w-3 h-3 text-sky-500" />
+                        <span>{item.eta}m</span>
+                      </div>
+                    </div>
+
+                    {/* Patient Line */}
+                    <h3 className="font-bold text-sm text-slate-900 leading-snug line-clamp-1">
+                      {item.title}
+                    </h3>
+
+                    {/* Mechanism */}
+                    <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
+                      {item.mechanism}
+                    </p>
+
+                    {/* Bottom Status Row */}
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2.5 pt-2 border-t border-slate-100 font-sans">
+                      <span className="flex items-center gap-1 text-slate-500">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        <span className="capitalize">{item.status.replace('-', ' ')}</span>
+                      </span>
+
+                      {item.run.bloodBankRequest && item.run.bloodBankRequest.status !== 'not-requested' && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.2 rounded">
+                          <Droplets className="w-2.5 h-2.5 fill-red-500 text-red-500" />
+                          <span>Blood Req</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </div>
+                )
+              })
             )}
-
-            {/* 2. Secondary Case (Bravo 3) */}
-            {(severityFilter === 'all' || severityFilter === 'urgent') && (
-              <div
-                onClick={() => setSelectedCaseId('secondary')}
-                className={cn(
-                  'p-3.5 rounded-xl border transition-all cursor-pointer relative',
-                  selectedCaseId === 'secondary'
-                    ? 'bg-[#152744] border-sky-500 shadow-md shadow-sky-500/10'
-                    : 'bg-[#101D33] border-[#1D3557] hover:border-slate-600'
-                )}
-              >
-                {selectedCaseId === 'secondary' && (
-                  <div className="absolute left-0 top-3 bottom-3 w-1 bg-sky-400 rounded-r" />
-                )}
-
-                <div className="flex items-start justify-between gap-2 mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-bold text-sm text-white">
-                      {secondaryRun.callsign}
-                    </span>
-                    <span className="font-mono text-[10px] text-slate-400">
-                      #{secondaryRun.id.slice(0, 12)}
-                    </span>
-                  </div>
-                  <Badge variant="amber" size="sm" className="bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                    P2 URGENT
-                  </Badge>
-                </div>
-
-                <p className="text-xs font-semibold text-slate-200 mb-1">
-                  {secondaryRun.patient.name} ({secondaryRun.patient.estimatedAge}y {secondaryRun.patient.sex})
-                </p>
-
-                <p className="text-xs text-slate-400 line-clamp-1 mb-2.5">
-                  {secondaryRun.incident.mechanism}
-                </p>
-
-                <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 pt-2 border-t border-[#1C3252]">
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="w-3 h-3 text-amber-400" />
-                    <span>ETA: <strong className="text-white">{secondaryRun.eta ?? 11} min</strong></span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <StatusChip status={secondaryRun.alertStatus} size="sm" />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Bay Capacity Status Box */}
-          <div className="p-3 bg-[#0A1322] border-t border-[#1E3A5F]">
-            <p className="font-mono text-[10px] text-slate-400 uppercase tracking-wider mb-2">
-              Resuscitation Bays Status
-            </p>
-            <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-              <div className="p-2 rounded-lg bg-[#122038] border border-[#1E3559]">
-                <span className="text-slate-400 block text-[10px]">Bay 1</span>
-                <span className="text-amber-400 font-semibold">Occupied (Trauma)</span>
-              </div>
-              <div className="p-2 rounded-lg bg-[#122038] border border-sky-500/40">
-                <span className="text-slate-400 block text-[10px]">Bay 2</span>
-                <span className="text-sky-400 font-semibold">Assigned (Alpha 7)</span>
-              </div>
-              <div className="p-2 rounded-lg bg-[#122038] border border-emerald-500/30">
-                <span className="text-slate-400 block text-[10px]">Bay 3</span>
-                <span className="text-emerald-400 font-semibold">Ready / Clean</span>
-              </div>
-              <div className="p-2 rounded-lg bg-[#122038] border border-slate-700">
-                <span className="text-slate-400 block text-[10px]">Bay 4</span>
-                <span className="text-slate-300 font-semibold">Ready / Clean</span>
-              </div>
-            </div>
           </div>
         </aside>
 
-        {/* ── RIGHT: Selected Case Console (Flex 1) ────────────────────────── */}
-        <main className="flex-1 flex flex-col overflow-y-auto bg-[#0A1120]">
-          {/* ── Case Hero Banner ───────────────────────────────────────────── */}
-          <div className="bg-[#0F1E38] border-b border-[#1E3A5F] p-4 lg:p-6">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div>
-                <div className="flex flex-wrap items-center gap-2 mb-2">
-                  <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30">
-                    UNIT {currentRun.callsign}
+        {/* ── MAIN WORKSPACE: Active Case ───────────────────────────────────── */}
+        <main
+          id="active-case"
+          className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 space-y-6 max-w-6xl mx-auto w-full"
+        >
+          {/* ── 1. PATIENT HEADER & PRIMARY IDENTITY ────────────────────────── */}
+          <section className="bg-white rounded-2xl border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+              {/* Left Identity Block */}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                    {currentRun.patient.name ?? `Unknown ${currentRun.patient.sex ?? 'Male'}`}
+                  </h1>
+                  <span className={cn(
+                    'px-2.5 py-0.5 rounded-full text-xs font-bold font-mono uppercase border',
+                    isCritical
+                      ? 'bg-rose-50 text-rose-700 border-rose-200'
+                      : 'bg-amber-50 text-amber-700 border-amber-200'
+                  )}>
+                    {urgencyLabel} Arrival
                   </span>
-                  <span className="font-mono text-xs text-slate-400">
-                    Lead: {currentRun.crewLead}
-                  </span>
-                  <span className="text-slate-600">·</span>
-                  <span className="font-mono text-xs text-slate-400">
-                    Status: <strong className="text-slate-200 capitalize">{currentRun.status.replace(/-/g, ' ')}</strong>
-                  </span>
-                  <span className="text-slate-600">·</span>
-                  <span className="font-mono text-xs text-slate-400">
-                    Last update: {formatTime(currentRun.updatedAt)}
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200/80 capitalize">
+                    {currentRun.patient.identityStatus.replace('-', ' ')}
                   </span>
                 </div>
 
-                <h1 className="text-xl lg:text-2xl font-bold text-white flex items-center gap-3">
-                  <span>{currentRun.patient.name ?? `Unknown ${currentRun.patient.sex ?? 'Male'}, ~${currentRun.patient.estimatedAge ?? 38}y`}</span>
-                  <span className="text-sm font-normal text-slate-400 font-mono">
-                    [{currentRun.patient.identityStatus === 'known' ? 'ID VERIFIED' : 'UNIDENTIFIED'}]
+                <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
+                  <span>Age: <strong>~{currentRun.patient.estimatedAge ?? 38} years</strong></span>
+                  <span className="text-slate-300">·</span>
+                  <span>Sex: <strong className="capitalize">{currentRun.patient.sex ?? 'Male'}</strong></span>
+                  {currentRun.patient.allergies && currentRun.patient.allergies.length > 0 && (
+                    <>
+                      <span className="text-slate-300">·</span>
+                      <span className="text-rose-600 font-bold">
+                        Allergies: {currentRun.patient.allergies.join(', ')}
+                      </span>
+                    </>
+                  )}
+                  <span className="text-slate-300">·</span>
+                  <span className="font-mono text-[11px] text-slate-400">
+                    ID: #{currentRun.id.slice(0, 10)}
                   </span>
-                </h1>
+                </div>
+              </div>
 
-                <p className="text-sm text-slate-300 mt-1 max-w-3xl">
-                  {currentRun.incident.mechanism}
-                  {currentRun.incident.detail ? ` — ${currentRun.incident.detail}` : ''}
+              {/* Right Transit & ETA Block */}
+              <div className="flex items-center gap-4 sm:border-l sm:pl-6 border-slate-200 flex-shrink-0">
+                <div className="text-left sm:text-right">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono block">
+                    Ambulance Unit
+                  </span>
+                  <span className="font-mono text-base font-black text-slate-900 block">
+                    {currentRun.callsign}
+                  </span>
+                  <span className="text-xs text-slate-500 font-sans">
+                    {currentRun.crewLead ?? 'Crew En Route'}
+                  </span>
+                </div>
+
+                <div className="bg-sky-50 border border-sky-200/80 rounded-2xl px-4 py-2.5 text-center min-w-[90px]">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-sky-600 font-mono block">
+                    ETA
+                  </span>
+                  <span className="text-2xl font-black text-sky-700 font-mono block leading-none mt-0.5">
+                    {currentRun.eta ?? 4}m
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* ── 2. RESTRAINED CRITICAL / URGENT ALERT BAND ──────────────────── */}
+            <div
+              className={cn(
+                'p-3.5 sm:p-4 rounded-xl border flex items-center justify-between gap-3 text-xs transition-colors',
+                isCritical
+                  ? 'bg-rose-50/80 border-rose-200 text-rose-900'
+                  : 'bg-amber-50/80 border-amber-200 text-amber-900'
+              )}
+            >
+              <div className="flex items-center gap-2.5">
+                {isCritical ? (
+                  <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                )}
+                <div className="space-y-0.5">
+                  <span className="font-bold tracking-tight uppercase font-mono text-[11px] block">
+                    {isCritical ? 'CRITICAL ARRIVAL PROTOCOL' : 'URGENT RECEIVING PRE-ALERT'}
+                  </span>
+                  <p className="font-medium text-slate-700">
+                    {currentRun.incident.mechanism} — {currentRun.incident.detail || 'High-risk trauma alert. Prepare primary survey resuscitation team.'}
+                  </p>
+                </div>
+              </div>
+
+              {currentRun.alertStatus !== 'acknowledged' ? (
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={handleAcknowledge}
+                  className="rounded-xl font-bold text-xs bg-slate-900 hover:bg-slate-800 text-white flex-shrink-0 shadow-xs"
+                >
+                  Acknowledge Pre-Alert
+                </Button>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-100 text-emerald-800 font-bold text-[11px] flex-shrink-0">
+                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Acknowledged</span>
+                </span>
+              )}
+            </div>
+          </section>
+
+          {/* ── 3. LATEST CLINICAL SNAPSHOT (OBSERVATIONS) ───────────────────── */}
+          <section className="bg-white rounded-2xl border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Activity className="w-4 h-4 text-sky-600" />
+                <h2 className="text-sm font-bold text-slate-900 uppercase font-mono tracking-wider">
+                  Latest Physiological Observations
+                </h2>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-slate-400 font-mono hidden sm:inline">
+                  Source: {latestVitals?.assessedBy ?? 'Lifepak 15 Telemetry'} · {formatRelativeMinutes(latestVitals?.timestamp)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setDrawerType('vitals-trend')}
+                  className="text-xs font-bold text-sky-600 hover:text-sky-700 hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <span>View Trend ({vitalsList.length} Readings)</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Structured Vital Readout Strips (Not 6 giant equal cards) */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+              {/* Heart Rate */}
+              <div className="bg-[#F8FAFD] rounded-xl p-3.5 border border-[#E8EFF6]">
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-[11px] font-bold uppercase font-mono">Heart Rate</span>
+                  <Heart className="w-3.5 h-3.5 text-rose-500" />
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl sm:text-3xl font-black font-mono text-slate-900">
+                    {latestVitals?.hr?.value ?? '112'}
+                  </span>
+                  <span className="text-xs text-slate-400 font-medium">bpm</span>
+                </div>
+                <span className="text-[10px] text-slate-400 mt-1 block">Norm 60–100</span>
+              </div>
+
+              {/* Blood Pressure */}
+              <div className="bg-[#F8FAFD] rounded-xl p-3.5 border border-[#E8EFF6]">
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-[11px] font-bold uppercase font-mono">Blood Pressure</span>
+                  <Activity className="w-3.5 h-3.5 text-sky-500" />
+                </div>
+                <div className="flex items-baseline gap-0.5">
+                  <span className={cn(
+                    'text-2xl sm:text-3xl font-black font-mono',
+                    (latestVitals?.sbp?.value ?? 98) < 95 ? 'text-rose-600' : 'text-slate-900'
+                  )}>
+                    {latestVitals?.sbp?.value ?? '98'}/{latestVitals?.dbp?.value ?? '64'}
+                  </span>
+                  <span className="text-xs text-slate-400 font-medium ml-1">mmHg</span>
+                </div>
+                <span className="text-[10px] text-slate-400 mt-1 block">Norm 120/80</span>
+              </div>
+
+              {/* SpO2 */}
+              <div className="bg-[#F8FAFD] rounded-xl p-3.5 border border-[#E8EFF6]">
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-[11px] font-bold uppercase font-mono">SpO₂</span>
+                  <Wind className="w-3.5 h-3.5 text-teal-500" />
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl sm:text-3xl font-black font-mono text-slate-900">
+                    {latestVitals?.spo2?.value ?? '97'}
+                  </span>
+                  <span className="text-xs text-slate-400 font-medium">%</span>
+                </div>
+                <span className="text-[10px] text-slate-400 mt-1 block">Norm 95–100%</span>
+              </div>
+
+              {/* Respiratory Rate */}
+              <div className="bg-[#F8FAFD] rounded-xl p-3.5 border border-[#E8EFF6]">
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-[11px] font-bold uppercase font-mono">Resp. Rate</span>
+                  <Activity className="w-3.5 h-3.5 text-amber-500" />
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl sm:text-3xl font-black font-mono text-slate-900">
+                    {latestVitals?.rr?.value ?? '20'}
+                  </span>
+                  <span className="text-xs text-slate-400 font-medium">/min</span>
+                </div>
+                <span className="text-[10px] text-slate-400 mt-1 block">Norm 12–20</span>
+              </div>
+
+              {/* Glasgow Coma Scale */}
+              <div className="bg-sky-50/80 rounded-xl p-3.5 border border-sky-200/80 col-span-2 sm:col-span-1">
+                <div className="flex items-center justify-between text-sky-700 mb-1">
+                  <span className="text-[11px] font-bold uppercase font-mono">GCS Score</span>
+                  <Eye className="w-3.5 h-3.5 text-sky-600" />
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl sm:text-3xl font-black font-mono text-sky-900">
+                    {latestVitals?.gcs?.total ?? 14}
+                  </span>
+                  <span className="text-xs text-sky-600 font-medium">/ 15</span>
+                </div>
+                <span className="text-[10px] text-sky-700 mt-1 block font-mono">
+                  E{latestVitals?.gcs?.components?.eye ?? 4} V{latestVitals?.gcs?.components?.verbal ?? 4} M{latestVitals?.gcs?.components?.motor ?? 6}
+                </span>
+              </div>
+            </div>
+          </section>
+
+          {/* ── 4. CLINICAL OVERVIEW (2-COLUMN INFORMATION ARRANGEMENT) ──────── */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* LEFT COLUMN: Mechanism & Structured Injuries */}
+            <div className="space-y-6">
+              {/* Mechanism Block */}
+              <div className="bg-white rounded-2xl border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">
+                    Mechanism of Injury
+                  </h3>
+                  <span className="text-xs text-slate-400 font-mono">
+                    Time: {currentRun.incident.time ?? 'Scene'}
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <h4 className="text-base font-extrabold text-slate-900">
+                    {currentRun.incident.mechanism}
+                  </h4>
+                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                    {currentRun.incident.detail || 'High-impact collision with prolonged vehicle extrication.'}
+                  </p>
+                  {currentRun.incident.location && (
+                    <div className="flex items-center gap-1.5 text-xs text-slate-400 pt-1 font-mono">
+                      <MapPin className="w-3 h-3 text-slate-400" />
+                      <span>{currentRun.incident.location}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Structured Injuries Block */}
+              <div className="bg-white rounded-2xl border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 font-mono">
+                      Documented Injuries
+                    </h3>
+                    <span className="font-mono text-xs font-bold px-2 py-0.2 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                      {currentRun.injuries.length}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setDrawerType('body-map')}
+                    className="text-xs font-bold text-sky-600 hover:text-sky-700 flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>Inspect 3D Body Map</span>
+                    <ChevronRight className="w-3 h-3" />
+                  </button>
+                </div>
+
+                {currentRun.injuries.length === 0 ? (
+                  <p className="text-xs text-slate-400 py-3">No specific anatomical injuries documented.</p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {currentRun.injuries.map((inj) => {
+                      const isSevere = inj.severity === 'severe' || inj.severity === 'critical'
+                      return (
+                        <div
+                          key={inj.id}
+                          className={cn(
+                            'p-3.5 rounded-xl border text-xs space-y-1 transition-colors',
+                            isSevere
+                              ? 'bg-rose-50/50 border-rose-200'
+                              : 'bg-slate-50/70 border-slate-200'
+                          )}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-black text-slate-900 capitalize">
+                              {inj.region.replace(/-/g, ' ')}
+                            </span>
+                            <span className={cn(
+                              'text-[10px] font-mono font-bold uppercase px-2 py-0.2 rounded border',
+                              isSevere
+                                ? 'bg-rose-100 text-rose-800 border-rose-200'
+                                : 'bg-slate-100 text-slate-700 border-slate-300'
+                            )}>
+                              {inj.type} · {inj.severity}
+                            </span>
+                          </div>
+                          {inj.notes && (
+                            <p className="text-xs text-slate-600 leading-snug">
+                              {inj.notes}
+                            </p>
+                          )}
+                          <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 font-mono">
+                            <span>Assessed by: {inj.assessedBy ?? 'Crew Lead'}</span>
+                            <span>{formatRelativeMinutes(inj.timestamp)}</span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: Key Signs & Pre-Hospital Treatment */}
+            <div className="space-y-6">
+              {/* Signs / Key Observations */}
+              <div className="bg-white rounded-2xl border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 font-mono">
+                    Key Signs & System Findings
+                  </h3>
+                  <span className="text-[10px] font-mono text-slate-400">Primary Survey Summary</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                    <span className="font-bold text-slate-500 text-[10px] uppercase font-mono block">Airway</span>
+                    <span className="font-black text-slate-800 mt-0.5 block">Patent & Maintained</span>
+                    <span className="text-[11px] text-slate-400 mt-0.5 block">High-flow O₂ running via NRM</span>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                    <span className="font-bold text-slate-500 text-[10px] uppercase font-mono block">Breathing</span>
+                    <span className="font-black text-slate-800 mt-0.5 block">SpO₂ 97% · RR 20</span>
+                    <span className="text-[11px] text-slate-400 mt-0.5 block">Left lateral rib tenderness noted</span>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                    <span className="font-bold text-slate-500 text-[10px] uppercase font-mono block">Circulation</span>
+                    <span className={cn('font-black mt-0.5 block', (latestVitals?.sbp?.value ?? 98) < 95 ? 'text-rose-600' : 'text-slate-800')}>
+                      BP 98/64 · HR 112 bpm
+                    </span>
+                    <span className="text-[11px] text-slate-400 mt-0.5 block">Pelvic binder applied for stability</span>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                    <span className="font-bold text-slate-500 text-[10px] uppercase font-mono block">Disability / GCS</span>
+                    <span className="font-black text-slate-800 mt-0.5 block">GCS 14 / 15 (E4 V4 M6)</span>
+                    <span className="text-[11px] text-slate-400 mt-0.5 block">Pupils equal, reactive to light</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pre-Hospital Treatment Timeline */}
+              <div className="bg-white rounded-2xl border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Stethoscope className="w-4 h-4 text-emerald-600" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 font-mono">
+                      Pre-Hospital Interventions ({currentRun.treatments.length})
+                    </h3>
+                  </div>
+                  <span className="text-xs text-slate-400 font-mono">Administered en route</span>
+                </div>
+
+                <div className="space-y-2">
+                  {currentRun.treatments.map((tx) => (
+                    <div
+                      key={tx.id}
+                      className="p-3 rounded-xl bg-[#F7FAFD] border border-[#E8EFF6] flex items-start justify-between gap-3 text-xs"
+                    >
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                          <span className="font-bold text-slate-900">{tx.description}</span>
+                        </div>
+                        <p className="text-slate-600 text-xs pl-4">{tx.detail}</p>
+                      </div>
+
+                      <div className="text-right text-[10px] font-mono text-slate-400 flex-shrink-0">
+                        <span>{formatRelativeMinutes(tx.timestamp)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── 5. HOSPITAL PREPARATION & BLOOD BANK SECTION ─────────────────── */}
+          <section
+            id="preparation"
+            className="bg-white rounded-2xl border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-5"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <h2 className="text-sm font-bold text-slate-900 uppercase font-mono tracking-wider">
+                    Hospital Preparation Status
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Click any department item to toggle readiness (Pending → In Progress → Ready).
                 </p>
               </div>
 
-              {/* Handover & Pre-Alert Action Panel */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-                {currentRun.alertStatus === 'sent' && isPrimary ? (
-                  <Button
-                    id="btn-ack-prealert"
-                    variant="success"
-                    size="lg"
-                    icon={<CheckCircle2 className="w-5 h-5 text-white" />}
-                    onClick={() => acknowledgeAlert('Dr. E. Vance (ED Trauma Lead)')}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-lg shadow-emerald-600/30 animate-pulse"
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-bold font-mono text-slate-700">
+                  {prepReadyCount} of {prepTotalCount} Confirmed Ready
+                </span>
+                <div className="w-28 h-2.5 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
+                  <div
+                    className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+                    style={{ width: `${prepPercent}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Preparation Cards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {prepItems.map((item) => {
+                const isReady = item.status === 'ready'
+                const isInProgress = item.status === 'in-progress'
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => cyclePrepStatus(item.id, item.status)}
+                    className={cn(
+                      'p-3.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between gap-3 select-none',
+                      isReady
+                        ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
+                        : isInProgress
+                        ? 'bg-amber-50/70 border-amber-200 text-amber-950'
+                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                    )}
                   >
-                    Acknowledge Pre-Alert
-                  </Button>
-                ) : (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                     <div>
-                      <span className="text-xs font-bold text-emerald-400 block leading-tight">
-                        Pre-Alert Acknowledged
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        {currentRun.alertAcknowledgedBy ?? 'ED Trauma Team Leader'}
+                      <span className="font-extrabold text-xs block">{item.label}</span>
+                      <span className="text-[10px] text-slate-500 block mt-0.5 font-mono">
+                        Dept: {item.team} · {formatRelativeMinutes(item.updatedAt)}
                       </span>
                     </div>
-                  </div>
-                )}
 
-                {/* Blood Bank Shortcut Pill */}
-                {currentRun.bloodBankRequest && (
-                  <button
-                    onClick={() => setActiveTab('blood')}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 transition-colors text-left"
-                  >
-                    <Droplets className="w-4 h-4 text-red-400 flex-shrink-0" />
-                    <div>
-                      <span className="text-xs font-bold text-red-400 block leading-tight">
-                        Blood Alert: {currentRun.bloodBankRequest.status}
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        {currentRun.bloodBankRequest.unitsRequested}u {currentRun.bloodBankRequest.productType}
-                      </span>
+                    <div className="flex-shrink-0">
+                      {isReady ? (
+                        <span className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-bold">
+                          ✓
+                        </span>
+                      ) : isInProgress ? (
+                        <span className="w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs font-bold">
+                          ◐
+                        </span>
+                      ) : (
+                        <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold">
+                          ○
+                        </span>
+                      )}
                     </div>
                   </button>
-                )}
-              </div>
+                )
+              })}
             </div>
 
-            {/* Quick KPI Strip */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-[#1A3356]">
-              <div className="bg-[#122340] p-2.5 rounded-xl border border-[#1E3A5F]">
-                <span className="font-mono text-[10px] text-slate-400 uppercase tracking-wider block">Est. Time of Arrival</span>
-                <span className="font-mono text-lg font-bold text-white flex items-center gap-1.5 mt-0.5">
-                  <Clock className="w-4 h-4 text-sky-400" />
-                  {currentRun.eta ?? 4} min
-                </span>
+            {/* ── DEDICATED BLOOD BANK SUBORDINATE MODULE ───────────────────── */}
+            {hasBlood && (
+              <div className="mt-4 p-4 rounded-xl bg-rose-50/70 border border-rose-200 text-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Droplets className="w-4 h-4 text-rose-600 fill-rose-600" />
+                    <span className="font-black text-rose-900 uppercase font-mono tracking-wider text-[11px]">
+                      Emergency Blood Products Requisition
+                    </span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full font-mono text-[10px] font-bold uppercase bg-rose-100 text-rose-800 border border-rose-300">
+                    Status: {bloodReq?.status}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-slate-700 bg-white/80 p-3 rounded-lg border border-rose-200/60 font-sans">
+                  <div>
+                    <span className="text-slate-400 block text-[10px] font-mono uppercase">Requested Product</span>
+                    <strong className="text-slate-900 text-xs">{bloodReq?.unitsRequested ?? 4} Units O-Negative PRBCs</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] font-mono uppercase">Clinical Justification</span>
+                    <span className="text-slate-900 text-xs truncate block">{bloodReq?.clinicalJustification ?? 'Haemodynamically unstable trauma'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] font-mono uppercase">Coordinating Facility</span>
+                    <span className="text-slate-900 text-xs block">{bloodReq?.recipient ?? 'St. Bartholomew\'s MTC Blood Bank'}</span>
+                  </div>
+                </div>
+
+                {isPrimary && bloodReq?.status === 'preparing' && (
+                  <div className="flex justify-end gap-2 pt-1">
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      onClick={() => updateBloodStatus('ready', { recipient: 'Bay 2 Standby' })}
+                      className="rounded-xl text-xs font-bold bg-rose-700 hover:bg-rose-800 text-white"
+                    >
+                      Confirm Blood Products Arrived in Bay 2
+                    </Button>
+                  </div>
+                )}
               </div>
-              <div className="bg-[#122340] p-2.5 rounded-xl border border-[#1E3A5F]">
-                <span className="font-mono text-[10px] text-slate-400 uppercase tracking-wider block">Assigned Bay</span>
-                <span className="font-mono text-lg font-bold text-sky-400 flex items-center gap-1.5 mt-0.5">
-                  <Bed className="w-4 h-4" />
-                  Resus Bay 2
-                </span>
+            )}
+          </section>
+
+          {/* ── 6. LIVE CHRONOLOGICAL ACTIVITY STREAM ───────────────────────── */}
+          <section
+            id="activity"
+            className="bg-white rounded-2xl border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-4"
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-sky-600" />
+                <h2 className="text-sm font-bold text-slate-900 uppercase font-mono tracking-wider">
+                  Live Chronological Activity
+                </h2>
               </div>
-              <div className="bg-[#122340] p-2.5 rounded-xl border border-[#1E3A5F]">
-                <span className="font-mono text-[10px] text-slate-400 uppercase tracking-wider block">Hospital Preparation</span>
-                <span className="font-mono text-lg font-bold text-emerald-400 flex items-center gap-1.5 mt-0.5">
-                  <Layers className="w-4 h-4" />
-                  {prepReadyCount}/{prepTotalCount} Ready
-                </span>
+              <span className="text-xs text-slate-400 font-mono">
+                {currentRun.events.length} Recorded Events
+              </span>
+            </div>
+
+            {/* Chronological List (Newest on top) */}
+            <div className="relative pl-6 space-y-3.5 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+              {[...currentRun.events].reverse().slice(0, 7).map((ev, i) => (
+                <div key={ev.id} className="relative text-xs space-y-0.5">
+                  {/* Timeline dot */}
+                  <span
+                    className={cn(
+                      'absolute -left-6 top-1 w-2.5 h-2.5 rounded-full border-2 bg-white',
+                      i === 0 ? 'border-sky-500 bg-sky-500' : 'border-slate-300'
+                    )}
+                  />
+
+                  <div className="flex items-center justify-between gap-3">
+                    <span className={cn('font-bold', i === 0 ? 'text-slate-900' : 'text-slate-700')}>
+                      {ev.description}
+                    </span>
+                    <span className="font-mono text-[10px] text-slate-400 flex-shrink-0">
+                      {formatClockTime(ev.timestamp)}
+                    </span>
+                  </div>
+
+                  {ev.operator && (
+                    <span className="text-[10px] text-slate-400 block font-mono">
+                      Logged by {ev.operator} · {ev.source}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* ── 7. MIST HANDOVER CONCISE BLOCK ──────────────────────────────── */}
+          <section className="bg-white rounded-2xl border border-[#E4EAF1] p-5 sm:p-6 shadow-xs space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-sky-600" />
+                <h2 className="text-sm font-bold text-slate-900 uppercase font-mono tracking-wider">
+                  Structured MIST Protocol Summary
+                </h2>
               </div>
-              <div className="bg-[#122340] p-2.5 rounded-xl border border-[#1E3A5F]">
-                <span className="font-mono text-[10px] text-slate-400 uppercase tracking-wider block">Blood Bank Status</span>
-                <span className="font-mono text-lg font-bold text-amber-400 flex items-center gap-1.5 mt-0.5 capitalize">
-                  <Droplets className="w-4 h-4 text-red-400" />
-                  {bloodStatus.replace(/-/g, ' ')}
-                </span>
+
+              <button
+                type="button"
+                onClick={() => setDrawerType('mist-full')}
+                className="text-xs font-bold text-sky-600 hover:text-sky-700 flex items-center gap-1 cursor-pointer"
+              >
+                <span>Open Full Signed Handover</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+              <div className="p-3.5 rounded-xl bg-sky-50/60 border border-sky-200/80 space-y-1">
+                <span className="font-black text-sky-700 uppercase font-mono text-[11px] block">M · Mechanism</span>
+                <p className="text-slate-700 line-clamp-3 leading-snug">
+                  {currentRun.mist?.mechanism ?? currentRun.incident.mechanism}
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-red-50/60 border border-red-200/80 space-y-1">
+                <span className="font-black text-red-700 uppercase font-mono text-[11px] block">I · Injuries Found</span>
+                <p className="text-slate-700 line-clamp-3 leading-snug">
+                  {currentRun.mist?.injuries ?? 'Pelvic instability, right temporal scalp laceration, left lateral chest contusion'}
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-amber-50/60 border border-amber-200/80 space-y-1">
+                <span className="font-black text-amber-700 uppercase font-mono text-[11px] block">S · Signs / Vitals</span>
+                <p className="text-slate-700 line-clamp-3 leading-snug">
+                  {currentRun.mist?.signs ?? `HR ${latestVitals?.hr?.value ?? 112} · BP ${latestVitals?.sbp?.value ?? 98}/${latestVitals?.dbp?.value ?? 64} · SpO₂ ${latestVitals?.spo2?.value ?? 97}% · GCS ${latestVitals?.gcs?.total ?? 14}`}
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-200/80 space-y-1">
+                <span className="font-black text-emerald-700 uppercase font-mono text-[11px] block">T · Treatment Given</span>
+                <p className="text-slate-700 line-clamp-3 leading-snug">
+                  {currentRun.mist?.treatment ?? 'High-flow O₂ 15L, 18G IV right AC, 500ml Hartmann\'s running, SAM Pelvic Binder II'}
+                </p>
               </div>
             </div>
-          </div>
-
-          {/* ── Console Navigation Tabs ────────────────────────────────────── */}
-          <div className="px-4 lg:px-6 bg-[#0E1A30] border-b border-[#1E3A5F] flex items-center gap-1 overflow-x-auto">
-            {[
-              { id: 'overview', label: 'Clinical Overview & Vitals', icon: Stethoscope },
-              { id: 'mist', label: 'MIST Handover', icon: FileText },
-              { id: 'prep', label: `Hospital Prep (${prepReadyCount}/${prepTotalCount})`, icon: Layers },
-              { id: 'blood', label: 'Blood Bank Coordination', icon: Droplets, highlight: bloodStatus !== 'not-requested' },
-              { id: 'timeline', label: `Event Trail (${currentRun.events.length})`, icon: Clock },
-            ].map((tab) => {
-              const Icon = tab.icon
-              const isCurrent = activeTab === tab.id
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as HospitalTab)}
-                  className={cn(
-                    'flex items-center gap-2 px-4 py-3 text-xs font-semibold whitespace-nowrap border-b-2 transition-all',
-                    isCurrent
-                      ? 'border-sky-400 text-sky-400 bg-sky-500/10'
-                      : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/5',
-                    tab.highlight && !isCurrent ? 'text-red-400' : ''
-                  )}
-                >
-                  <Icon className={cn('w-4 h-4', tab.highlight ? 'text-red-400' : '')} />
-                  <span>{tab.label}</span>
-                </button>
-              )
-            })}
-          </div>
-
-          {/* ── Tab Views ──────────────────────────────────────────────────── */}
-          <div className="p-4 lg:p-6 flex-1">
-            {/* 1. CLINICAL OVERVIEW & VITALS */}
-            {activeTab === 'overview' && (
-              <div className="space-y-6">
-                {/* Latest Vitals Panel */}
-                <section>
-                  <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-sm font-bold text-white uppercase tracking-wider font-mono flex items-center gap-2">
-                      <Activity className="w-4 h-4 text-sky-400" />
-                      Latest Vital Observations
-                    </h2>
-                    {currentRun.vitalObservations.length > 0 && (
-                      <span className="font-mono text-xs text-slate-400">
-                        Assessed by {currentRun.vitalObservations[currentRun.vitalObservations.length - 1].assessedBy ?? 'Monitor'} · {formatShortTime(currentRun.vitalObservations[currentRun.vitalObservations.length - 1].timestamp)}
-                      </span>
-                    )}
-                  </div>
-
-                  {(() => {
-                    const latest = currentRun.vitalObservations[currentRun.vitalObservations.length - 1]
-                    if (!latest) {
-                      return (
-                        <div className="p-6 rounded-2xl bg-[#101D33] border border-[#1E3A5F] text-center text-slate-400">
-                          No vital observations recorded yet.
-                        </div>
-                      )
-                    }
-                    return (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                        {/* HR */}
-                        <div className="p-3.5 rounded-2xl bg-[#11213D] border border-[#1E3A5F]">
-                          <span className="font-mono text-[10px] text-slate-400 uppercase tracking-wider block">Heart Rate</span>
-                          <div className="flex items-baseline gap-1 mt-1">
-                            <span className={cn('font-mono text-2xl font-bold', (latest.hr?.value ?? 0) > 100 ? 'text-amber-400' : 'text-white')}>
-                              {latest.hr?.value ?? '—'}
-                            </span>
-                            <span className="font-mono text-xs text-slate-400">bpm</span>
-                          </div>
-                          <span className="font-mono text-[9px] text-slate-400 block mt-1">Normal: 60–100</span>
-                        </div>
-
-                        {/* BP */}
-                        <div className="p-3.5 rounded-2xl bg-[#11213D] border border-[#1E3A5F]">
-                          <span className="font-mono text-[10px] text-slate-400 uppercase tracking-wider block">Blood Pressure</span>
-                          <div className="flex items-baseline gap-1 mt-1">
-                            <span className={cn('font-mono text-2xl font-bold', (latest.sbp?.value ?? 120) < 100 ? 'text-red-400' : 'text-white')}>
-                              {latest.sbp?.value ?? '—'}/{latest.dbp?.value ?? '—'}
-                            </span>
-                            <span className="font-mono text-xs text-slate-400">mmHg</span>
-                          </div>
-                          <span className="font-mono text-[9px] text-slate-400 block mt-1">Normal: 120/80</span>
-                        </div>
-
-                        {/* SpO2 */}
-                        <div className="p-3.5 rounded-2xl bg-[#11213D] border border-[#1E3A5F]">
-                          <span className="font-mono text-[10px] text-slate-400 uppercase tracking-wider block">SpO₂ Oxygen</span>
-                          <div className="flex items-baseline gap-1 mt-1">
-                            <span className={cn('font-mono text-2xl font-bold', (latest.spo2?.value ?? 100) < 95 ? 'text-amber-400' : 'text-white')}>
-                              {latest.spo2?.value ?? '—'}
-                            </span>
-                            <span className="font-mono text-xs text-slate-400">%</span>
-                          </div>
-                          <span className="font-mono text-[9px] text-slate-400 block mt-1">Normal: 95–100%</span>
-                        </div>
-
-                        {/* RR */}
-                        <div className="p-3.5 rounded-2xl bg-[#11213D] border border-[#1E3A5F]">
-                          <span className="font-mono text-[10px] text-slate-400 uppercase tracking-wider block">Resp. Rate</span>
-                          <div className="flex items-baseline gap-1 mt-1">
-                            <span className={cn('font-mono text-2xl font-bold', (latest.rr?.value ?? 16) > 20 ? 'text-amber-400' : 'text-white')}>
-                              {latest.rr?.value ?? '—'}
-                            </span>
-                            <span className="font-mono text-xs text-slate-400">brpm</span>
-                          </div>
-                          <span className="font-mono text-[9px] text-slate-400 block mt-1">Normal: 12–20</span>
-                        </div>
-
-                        {/* GCS */}
-                        <div className="p-3.5 rounded-2xl bg-[#11213D] border border-[#1E3A5F]">
-                          <span className="font-mono text-[10px] text-slate-400 uppercase tracking-wider block">Glasgow Coma Scale</span>
-                          <div className="flex items-baseline gap-1 mt-1">
-                            <span className={cn('font-mono text-2xl font-bold', (latest.gcs?.total ?? 15) < 15 ? 'text-amber-400' : 'text-white')}>
-                              {latest.gcs?.total ?? '—'}
-                            </span>
-                            <span className="font-mono text-xs text-slate-400">/15</span>
-                          </div>
-                          <span className="font-mono text-[9px] text-slate-400 block mt-1">
-                            E:{latest.gcs?.components?.eye ?? '·'} V:{latest.gcs?.components?.verbal ?? '·'} M:{latest.gcs?.components?.motor ?? '·'}
-                          </span>
-                        </div>
-
-                        {/* Source */}
-                        <div className="p-3.5 rounded-2xl bg-[#11213D] border border-[#1E3A5F]">
-                          <span className="font-mono text-[10px] text-slate-400 uppercase tracking-wider block">Data Source</span>
-                          <span className="inline-block mt-2 font-mono text-xs font-semibold px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30 capitalize">
-                            {latest.source}
-                          </span>
-                          <span className="font-mono text-[9px] text-slate-400 block mt-1.5">
-                            {latest.assessedBy ?? 'Direct Entry'}
-                          </span>
-                        </div>
-                      </div>
-                    )
-                  })()}
-                </section>
-
-                {/* Vitals Trend Table */}
-                {currentRun.vitalObservations.length > 1 && (
-                  <section className="bg-[#101D33] rounded-2xl border border-[#1E3A5F] p-4">
-                    <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider font-mono mb-3">
-                      Physiological Trend Over Time
-                    </h3>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs font-mono">
-                        <thead>
-                          <tr className="text-slate-400 border-b border-[#1E3A5F] text-left">
-                            <th className="pb-2">Time</th>
-                            <th className="pb-2">Source</th>
-                            <th className="pb-2">HR (bpm)</th>
-                            <th className="pb-2">BP (mmHg)</th>
-                            <th className="pb-2">SpO₂ (%)</th>
-                            <th className="pb-2">RR (brpm)</th>
-                            <th className="pb-2">GCS</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#182C4E]">
-                          {currentRun.vitalObservations.map((obs) => (
-                            <tr key={obs.id} className="text-slate-200">
-                              <td className="py-2 text-slate-400">{formatShortTime(obs.timestamp)}</td>
-                              <td className="py-2 text-sky-400 capitalize">{obs.source}</td>
-                              <td className="py-2">{obs.hr?.value ?? '—'}</td>
-                              <td className="py-2">{obs.sbp?.value ?? '—'}/{obs.dbp?.value ?? '—'}</td>
-                              <td className="py-2">{obs.spo2?.value ?? '—'}%</td>
-                              <td className="py-2">{obs.rr?.value ?? '—'}</td>
-                              <td className="py-2">{obs.gcs?.total ?? '—'}/15</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </section>
-                )}
-
-                {/* Split: Injury Map Summary & Treatments */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Recorded Injuries */}
-                  <section className="bg-[#101D33] rounded-2xl border border-[#1E3A5F] p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-red-400" />
-                        Recorded Injuries ({currentRun.injuries.length})
-                      </h3>
-                      <span className="font-mono text-[10px] text-slate-400">Anatomical assessment</span>
-                    </div>
-
-                    {currentRun.injuries.length === 0 ? (
-                      <p className="text-xs text-slate-400 py-4 text-center">No injuries mapped.</p>
-                    ) : (
-                      <div className="space-y-2.5">
-                        {currentRun.injuries.map((inj) => (
-                          <div key={inj.id} className="p-3 rounded-xl bg-[#142440] border border-[#1E3A5F]">
-                            <div className="flex items-center justify-between gap-2 mb-1">
-                              <span className="font-semibold text-xs text-white capitalize">
-                                {inj.laterality !== 'na' ? `${inj.laterality} ` : ''}{inj.region.replace(/-/g, ' ')}
-                              </span>
-                              <Badge
-                                variant={
-                                  inj.severity === 'critical' || inj.severity === 'severe'
-                                    ? 'red'
-                                    : inj.severity === 'moderate'
-                                    ? 'amber'
-                                    : 'emerald'
-                                }
-                                size="sm"
-                              >
-                                {inj.severity}
-                              </Badge>
-                            </div>
-                            <div className="flex items-center gap-2 text-[11px] text-slate-400 mb-1">
-                              <span className="font-mono capitalize text-sky-400">{inj.type} trauma</span>
-                              <span>·</span>
-                              <span>Assessed by {inj.assessedBy ?? 'Crew'}</span>
-                            </div>
-                            {inj.notes && (
-                              <p className="text-xs text-slate-300 italic bg-[#0D182B] p-2 rounded-lg mt-1 border border-[#182C4C]">
-                                "{inj.notes}"
-                              </p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </section>
-
-                  {/* Pre-Hospital Treatments */}
-                  <section className="bg-[#101D33] rounded-2xl border border-[#1E3A5F] p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                        <Stethoscope className="w-4 h-4 text-emerald-400" />
-                        Pre-Hospital Treatments ({currentRun.treatments.length})
-                      </h3>
-                      <span className="font-mono text-[10px] text-slate-400">Administered en route</span>
-                    </div>
-
-                    {currentRun.treatments.length === 0 ? (
-                      <p className="text-xs text-slate-400 py-4 text-center">No treatments recorded.</p>
-                    ) : (
-                      <div className="space-y-2.5">
-                        {currentRun.treatments.map((tx) => (
-                          <div key={tx.id} className="p-3 rounded-xl bg-[#142440] border border-[#1E3A5F]">
-                            <div className="flex items-center justify-between gap-2 mb-1">
-                              <span className="font-semibold text-xs text-white">{tx.description}</span>
-                              <span className="font-mono text-[10px] text-slate-400">
-                                {formatShortTime(tx.timestamp)}
-                              </span>
-                            </div>
-                            {tx.detail && (
-                              <p className="text-xs text-slate-300 mb-1.5">{tx.detail}</p>
-                            )}
-                            <div className="flex items-center gap-2 text-[10px] font-mono text-slate-400">
-                              <span className="capitalize text-emerald-400 font-medium">{tx.category.replace(/-/g, ' ')}</span>
-                              <span>·</span>
-                              <span>By {tx.performedBy ?? 'Crew'}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </section>
-                </div>
-              </div>
-            )}
-
-            {/* 2. MIST HANDOVER */}
-            {activeTab === 'mist' && (
-              <div className="space-y-6 max-w-4xl">
-                <div className="bg-[#101D33] rounded-2xl border border-[#1E3A5F] p-6">
-                  <div className="flex items-start justify-between gap-4 pb-4 border-b border-[#1E3A5F] mb-6">
-                    <div>
-                      <h2 className="text-lg font-bold text-white">MIST Structured Trauma Handover</h2>
-                      <p className="text-xs text-slate-400 font-mono mt-1">
-                        Mechanism · Injuries · Signs · Treatment
-                      </p>
-                    </div>
-                    {currentRun.mist?.confirmedBy ? (
-                      <Badge variant="emerald" size="md">
-                        ✓ Confirmed by {currentRun.mist.confirmedBy}
-                      </Badge>
-                    ) : (
-                      <Badge variant="amber" size="md">
-                        Draft / Pending EMT confirmation
-                      </Badge>
-                    )}
-                  </div>
-
-                  <div className="space-y-6">
-                    {/* M */}
-                    <div className="flex items-start gap-4">
-                      <div className="w-9 h-9 rounded-xl bg-sky-500/20 border border-sky-500/30 flex items-center justify-center font-mono font-bold text-sky-400 text-lg flex-shrink-0">
-                        M
-                      </div>
-                      <div className="flex-1">
-                        <span className="font-mono text-xs font-semibold text-sky-400 uppercase tracking-wider block mb-1">
-                          Mechanism of Injury
-                        </span>
-                        <div className="p-3.5 rounded-xl bg-[#14233C] border border-[#1E3A5F] text-sm text-slate-200 leading-relaxed">
-                          {currentRun.mist?.mechanism ?? currentRun.incident.mechanism ?? 'Mechanism not specified'}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* I */}
-                    <div className="flex items-start gap-4">
-                      <div className="w-9 h-9 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center font-mono font-bold text-red-400 text-lg flex-shrink-0">
-                        I
-                      </div>
-                      <div className="flex-1">
-                        <span className="font-mono text-xs font-semibold text-red-400 uppercase tracking-wider block mb-1">
-                          Injuries Found or Suspected
-                        </span>
-                        <div className="p-3.5 rounded-xl bg-[#14233C] border border-[#1E3A5F] text-sm text-slate-200 whitespace-pre-line leading-relaxed">
-                          {currentRun.mist?.injuries ?? 'No injuries recorded'}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* S */}
-                    <div className="flex items-start gap-4">
-                      <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center font-mono font-bold text-amber-400 text-lg flex-shrink-0">
-                        S
-                      </div>
-                      <div className="flex-1">
-                        <span className="font-mono text-xs font-semibold text-amber-400 uppercase tracking-wider block mb-1">
-                          Signs & Physiological Vitals
-                        </span>
-                        <div className="p-3.5 rounded-xl bg-[#14233C] border border-[#1E3A5F] text-sm font-mono text-slate-200 leading-relaxed">
-                          {currentRun.mist?.signs ?? 'Signs pending'}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* T */}
-                    <div className="flex items-start gap-4">
-                      <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center font-mono font-bold text-emerald-400 text-lg flex-shrink-0">
-                        T
-                      </div>
-                      <div className="flex-1">
-                        <span className="font-mono text-xs font-semibold text-emerald-400 uppercase tracking-wider block mb-1">
-                          Treatment Administered
-                        </span>
-                        <div className="p-3.5 rounded-xl bg-[#14233C] border border-[#1E3A5F] text-sm text-slate-200 whitespace-pre-line leading-relaxed">
-                          {currentRun.mist?.treatment ?? 'No pre-hospital treatments recorded'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 pt-4 border-t border-[#1E3A5F] flex items-center justify-between text-xs text-slate-400 font-mono">
-                    <span>Generated: {formatTime(currentRun.mist?.generatedAt)}</span>
-                    <span>Patient ID: {currentRun.patient.id}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* 3. HOSPITAL PREPARATION CHECKLIST */}
-            {activeTab === 'prep' && (
-              <div className="space-y-6 max-w-4xl">
-                <div className="bg-[#101D33] rounded-2xl border border-[#1E3A5F] p-6">
-                  <div className="flex items-start justify-between gap-4 pb-4 border-b border-[#1E3A5F] mb-6">
-                    <div>
-                      <h2 className="text-lg font-bold text-white">Trauma Receiving Preparation Checklist</h2>
-                      <p className="text-xs text-slate-400 mt-1">
-                        Tap any station to toggle readiness status across ED teams. Real-time synchronised with ambulance.
-                      </p>
-                    </div>
-                    <div className="font-mono text-xs px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
-                      {prepReadyCount} of {prepTotalCount} Stations Ready
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {currentRun.hospitalPrep.map((prep) => {
-                      const nextStatusMap: Record<HospitalPrep['status'], HospitalPrep['status']> = {
-                        pending: 'in-progress',
-                        'in-progress': 'ready',
-                        ready: 'unavailable',
-                        unavailable: 'pending',
-                      }
-
-                      return (
-                        <div
-                          key={prep.id}
-                          className={cn(
-                            'p-4 rounded-xl border transition-all flex flex-col justify-between gap-3',
-                            prep.status === 'ready'
-                              ? 'bg-emerald-500/10 border-emerald-500/30'
-                              : prep.status === 'in-progress'
-                              ? 'bg-sky-500/10 border-sky-500/30'
-                              : prep.status === 'unavailable'
-                              ? 'bg-red-500/10 border-red-500/30'
-                              : 'bg-[#14233C] border-[#1E3A5F]'
-                          )}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <span className="font-bold text-sm text-white block">
-                                {prep.label}
-                              </span>
-                              <span className="font-mono text-[10px] text-slate-400">
-                                Team: {prep.team ?? 'ED Staff'} · Updated {formatShortTime(prep.updatedAt)}
-                              </span>
-                            </div>
-                            <span
-                              className={cn(
-                                'font-mono text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full',
-                                prep.status === 'ready'
-                                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                  : prep.status === 'in-progress'
-                                  ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
-                                  : prep.status === 'unavailable'
-                                  ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                                  : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                              )}
-                            >
-                              {prep.status}
-                            </span>
-                          </div>
-
-                          {/* Action toggle buttons */}
-                          {isPrimary && (
-                            <div className="flex items-center gap-1.5 pt-2 border-t border-[#1C3252]">
-                              <button
-                                onClick={() => updateHospitalPrep(prep.id, 'ready', 'ED Trauma Lead')}
-                                className={cn(
-                                  'flex-1 py-1 text-[11px] font-semibold rounded transition-colors',
-                                  prep.status === 'ready'
-                                    ? 'bg-emerald-500 text-white font-bold'
-                                    : 'bg-[#1B2F4E] text-slate-300 hover:text-white'
-                                )}
-                              >
-                                Mark Ready
-                              </button>
-                              <button
-                                onClick={() => updateHospitalPrep(prep.id, 'in-progress', 'ED Trauma Lead')}
-                                className={cn(
-                                  'flex-1 py-1 text-[11px] font-semibold rounded transition-colors',
-                                  prep.status === 'in-progress'
-                                    ? 'bg-sky-500 text-white font-bold'
-                                    : 'bg-[#1B2F4E] text-slate-300 hover:text-white'
-                                )}
-                              >
-                                In Progress
-                              </button>
-                              <button
-                                onClick={() => updateHospitalPrep(prep.id, 'pending', 'ED Trauma Lead')}
-                                className={cn(
-                                  'px-2 py-1 text-[11px] font-semibold rounded transition-colors',
-                                  prep.status === 'pending'
-                                    ? 'bg-amber-500 text-slate-950 font-bold'
-                                    : 'bg-[#1B2F4E] text-slate-400 hover:text-white'
-                                )}
-                              >
-                                Reset
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* 4. BLOOD BANK COORDINATION */}
-            {activeTab === 'blood' && (
-              <div className="space-y-6 max-w-4xl">
-                <div className="bg-[#101D33] rounded-2xl border border-[#1E3A5F] p-6">
-                  <div className="flex items-start justify-between gap-4 pb-4 border-b border-[#1E3A5F] mb-6">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <Droplets className="w-5 h-5 text-red-500" />
-                        <h2 className="text-lg font-bold text-white">Transfusion & Blood Bank Coordination</h2>
-                      </div>
-                      <p className="text-xs text-slate-400 mt-1">
-                        Emergency blood requisition workflow between pre-hospital crew and MTC blood laboratory.
-                      </p>
-                    </div>
-
-                    <div className="text-right">
-                      <span className="font-mono text-[10px] text-amber-500 uppercase tracking-widest block font-bold">
-                        DEMO SIMULATION
-                      </span>
-                      <span className="font-mono text-xs text-slate-400">
-                        Status: <strong className="text-white uppercase">{bloodStatus}</strong>
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Interactive Workflow Stepper */}
-                  <div className="mb-8 p-4 rounded-xl bg-[#0D182B] border border-[#192E4E]">
-                    <p className="font-mono text-[10px] text-slate-400 uppercase tracking-wider mb-3">
-                      Requisition Progression
-                    </p>
-                    <div className="grid grid-cols-5 gap-2 text-center text-xs font-mono">
-                      {[
-                        { key: 'sent', label: '1. Sent' },
-                        { key: 'acknowledged', label: '2. Acknowledged' },
-                        { key: 'info-requested', label: '3. Clarification' },
-                        { key: 'preparing', label: '4. Preparing' },
-                        { key: 'ready', label: '5. Ready' },
-                      ].map((step, idx) => {
-                        const stepOrder = ['sent', 'acknowledged', 'info-requested', 'preparing', 'ready']
-                        const curIdx = stepOrder.indexOf(bloodStatus === 'info-received' ? 'preparing' : bloodStatus)
-                        const isDone = curIdx >= idx
-                        const isCurrent = bloodStatus === step.key || (step.key === 'info-requested' && bloodStatus === 'info-received')
-
-                        return (
-                          <div
-                            key={step.key}
-                            className={cn(
-                              'p-2 rounded-lg border transition-all',
-                              isCurrent
-                                ? 'bg-sky-500/20 border-sky-400 text-sky-300 font-bold'
-                                : isDone
-                                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                                : 'bg-[#12223B] border-transparent text-slate-500'
-                            )}
-                          >
-                            <span>{step.label}</span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-
-                  {currentRun.bloodBankRequest ? (
-                    <div className="space-y-6">
-                      {/* Request Summary Card */}
-                      <div className="p-4 rounded-xl bg-[#14233D] border border-[#1E3A5F]">
-                        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider font-mono mb-3">
-                          Requisition Details
-                        </h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs font-mono">
-                          <div>
-                            <span className="text-slate-400 block text-[10px]">Product Type</span>
-                            <span className="text-white font-bold capitalize mt-0.5 block">
-                              {currentRun.bloodBankRequest.productType?.replace(/-/g, ' ') ?? 'O-Negative'}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 block text-[10px]">Units Requested</span>
-                            <span className="text-red-400 font-bold text-base mt-0.5 block">
-                              {currentRun.bloodBankRequest.unitsRequested ?? 4} Units
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 block text-[10px]">Recipient Lab</span>
-                            <span className="text-white mt-0.5 block">
-                              {currentRun.bloodBankRequest.recipient}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 block text-[10px]">Created At</span>
-                            <span className="text-white mt-0.5 block">
-                              {formatShortTime(currentRun.bloodBankRequest.createdAt)}
-                            </span>
-                          </div>
-                        </div>
-
-                        {currentRun.bloodBankRequest.clinicalJustification && (
-                          <div className="mt-3 pt-3 border-t border-[#1C3252]">
-                            <span className="text-[10px] font-mono text-slate-400 block mb-1">Clinical Justification:</span>
-                            <p className="text-xs text-slate-200 italic">
-                              "{currentRun.bloodBankRequest.clinicalJustification}"
-                            </p>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Clarification Exchange Box (if active) */}
-                      {currentRun.bloodBankRequest.infoRequestText && (
-                        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
-                          <div className="flex items-center gap-2 mb-2">
-                            <HelpCircle className="w-4 h-4 text-amber-400" />
-                            <span className="text-xs font-bold text-amber-400">
-                              Hospital Clarification Request
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-200 mb-2">
-                            "{currentRun.bloodBankRequest.infoRequestText}"
-                          </p>
-
-                          {currentRun.bloodBankRequest.infoResponseText ? (
-                            <div className="mt-2 pt-2 border-t border-amber-500/20 text-xs text-emerald-400 font-mono">
-                              <strong>Ambulance Response:</strong> "{currentRun.bloodBankRequest.infoResponseText}"
-                            </div>
-                          ) : (
-                            <div className="mt-2 pt-2 border-t border-amber-500/20 flex items-center justify-between">
-                              <span className="text-[11px] text-amber-400 font-mono">
-                                Awaiting response from crew...
-                              </span>
-                              {isPrimary && (
-                                <button
-                                  onClick={() =>
-                                    updateBloodStatus('info-received', {
-                                      infoResponseText: 'Confirmed: 18G IV right AC running, estimated weight 80kg.',
-                                    })
-                                  }
-                                  className="text-xs px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-medium transition-colors"
-                                >
-                                  Simulate Ambulance Reply
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Hospital Blood Bank Action Buttons */}
-                      {isPrimary && (
-                        <div className="space-y-3 pt-2">
-                          <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider font-mono">
-                            Hospital Staff Actions
-                          </h4>
-
-                          <div className="flex flex-wrap items-center gap-3">
-                            {/* 1. Acknowledge */}
-                            {bloodStatus === 'sent' && (
-                              <Button
-                                variant="primary"
-                                size="md"
-                                icon={<Check className="w-4 h-4" />}
-                                onClick={() => updateBloodStatus('acknowledged')}
-                              >
-                                Acknowledge Blood Requisition
-                              </Button>
-                            )}
-
-                            {/* 2. Request Clarification */}
-                            {(bloodStatus === 'acknowledged' || bloodStatus === 'sent') && (
-                              <Button
-                                variant="secondary"
-                                size="md"
-                                icon={<HelpCircle className="w-4 h-4" />}
-                                onClick={() => setShowClarificationInput(!showClarificationInput)}
-                                className="bg-[#172844] border-[#22406E] text-slate-200"
-                              >
-                                Request Clarification from Crew
-                              </Button>
-                            )}
-
-                            {/* 3. Start Preparation */}
-                            {(bloodStatus === 'acknowledged' || bloodStatus === 'info-received') && (
-                              <Button
-                                variant="primary"
-                                size="md"
-                                icon={<Droplets className="w-4 h-4" />}
-                                onClick={() => updateBloodStatus('preparing')}
-                                className="bg-amber-600 hover:bg-amber-500"
-                              >
-                                Begin Thawing / Product Preparation
-                              </Button>
-                            )}
-
-                            {/* 4. Mark Ready */}
-                            {bloodStatus === 'preparing' && (
-                              <Button
-                                variant="success"
-                                size="md"
-                                icon={<CheckCircle2 className="w-4 h-4" />}
-                                onClick={() => updateBloodStatus('ready')}
-                                className="bg-emerald-600 hover:bg-emerald-500"
-                              >
-                                Mark Ready for Resus Bay Collection
-                              </Button>
-                            )}
-
-                            {/* 5. Cancel */}
-                            {bloodStatus !== 'ready' && bloodStatus !== 'cancelled' && (
-                              <Button
-                                variant="danger"
-                                size="sm"
-                                onClick={() => updateBloodStatus('cancelled')}
-                                className="bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30"
-                              >
-                                Cancel Request
-                              </Button>
-                            )}
-                          </div>
-
-                          {/* Clarification input form */}
-                          {showClarificationInput && (
-                            <div className="p-4 rounded-xl bg-[#14233D] border border-sky-500/30 space-y-3 mt-3">
-                              <p className="text-xs font-semibold text-sky-400">
-                                Send Clarification Query to Ambulance {currentRun.callsign}:
-                              </p>
-                              <Input
-                                placeholder="e.g. Please confirm patient estimated weight and IV cannula size"
-                                value={clarificationText}
-                                onChange={(e) => setClarificationText(e.target.value)}
-                                className="bg-[#0E1A2E] text-white border-[#1E3A5F]"
-                              />
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  size="sm"
-                                  icon={<Send className="w-3.5 h-3.5" />}
-                                  onClick={() => {
-                                    if (clarificationText.trim()) {
-                                      updateBloodStatus('info-requested', {
-                                        infoRequestText: clarificationText.trim(),
-                                      })
-                                      setClarificationText('')
-                                      setShowClarificationInput(false)
-                                    }
-                                  }}
-                                >
-                                  Transmit Question
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setShowClarificationInput(false)}
-                                >
-                                  Cancel
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-slate-400 text-xs">
-                      No blood products requested for this run.
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* 5. CHRONOLOGICAL EVENT TRAIL */}
-            {activeTab === 'timeline' && (
-              <div className="space-y-6 max-w-4xl">
-                <div className="bg-[#101D33] rounded-2xl border border-[#1E3A5F] p-6">
-                  <div className="flex items-center justify-between pb-4 border-b border-[#1E3A5F] mb-6">
-                    <div>
-                      <h2 className="text-lg font-bold text-white">Emergency Run Event Trail & Audit Log</h2>
-                      <p className="text-xs text-slate-400 mt-1">
-                        Chronological record of clinical, telemetry, and pre-alert actions.
-                      </p>
-                    </div>
-
-                    {isPrimary && (
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        icon={<FileText className="w-3.5 h-3.5" />}
-                        onClick={() => setShowAddNote(!showAddNote)}
-                        className="bg-[#152540] border-[#22406E] text-slate-200"
-                      >
-                        + Add Hospital Event Note
-                      </Button>
-                    )}
-                  </div>
-
-                  {/* Add Event Note Form */}
-                  {showAddNote && (
-                    <div className="p-4 rounded-xl bg-[#14233D] border border-sky-500/30 mb-6 space-y-3">
-                      <p className="text-xs font-semibold text-sky-400">Log Hospital ED Clinical Event:</p>
-                      <Input
-                        placeholder="e.g. Trauma Team briefing commenced in Bay 2 with Lead Surgeon"
-                        value={newNoteText}
-                        onChange={(e) => setNewNoteText(e.target.value)}
-                        className="bg-[#0E1A2E] text-white border-[#1E3A5F]"
-                      />
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            if (newNoteText.trim()) {
-                              addEvent('note', newNoteText.trim())
-                              setNewNoteText('')
-                              setShowAddNote(false)
-                            }
-                          }}
-                        >
-                          Append to Audit Log
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setShowAddNote(false)}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Timeline Stream */}
-                  <div className="space-y-3 relative before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-[#1E3A5F]">
-                    {currentRun.events.map((ev, idx) => {
-                      const sourceStyles: Record<string, { bg: string; text: string; badge: string }> = {
-                        ambulance: { bg: 'bg-sky-500', text: 'text-sky-400', badge: 'bg-sky-500/20 text-sky-300' },
-                        hospital:  { bg: 'bg-emerald-500', text: 'text-emerald-400', badge: 'bg-emerald-500/20 text-emerald-300' },
-                        system:    { bg: 'bg-slate-400', text: 'text-slate-300', badge: 'bg-slate-700 text-slate-300' },
-                        demo:      { bg: 'bg-amber-400', text: 'text-amber-400', badge: 'bg-amber-500/20 text-amber-300' },
-                      }
-                      const style = sourceStyles[ev.source] ?? sourceStyles.system
-
-                      return (
-                        <div key={ev.id} className="flex items-start gap-4 pl-8 relative">
-                          <div
-                            className={cn(
-                              'absolute left-1.5 top-1.5 w-3 h-3 rounded-full border-2 border-[#101D33]',
-                              style.bg
-                            )}
-                          />
-
-                          <div className="flex-1 p-3 rounded-xl bg-[#14233C] border border-[#1E3A5F]">
-                            <div className="flex items-center justify-between gap-2 mb-1">
-                              <span className="font-semibold text-xs text-white">
-                                {ev.description}
-                              </span>
-                              <span className="font-mono text-[10px] text-slate-400">
-                                {formatShortTime(ev.timestamp)}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-2 text-[10px] font-mono text-slate-400">
-                              <span className={cn('px-1.5 py-0.2 rounded font-semibold uppercase', style.badge)}>
-                                {ev.source}
-                              </span>
-                              {ev.operator && (
-                                <>
-                                  <span>·</span>
-                                  <span>Operator: {ev.operator}</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          </section>
         </main>
       </div>
+
+      {/* ── PROGRESSIVE DISCLOSURE MODALS / DRAWERS ───────────────────────── */}
+      <AnimatePresence>
+        {drawerType !== 'none' && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              className="bg-white rounded-3xl border border-[#E4EAF1] shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden text-slate-900"
+            >
+              {/* Drawer Header */}
+              <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                  <h3 className="font-black text-lg text-slate-900">
+                    {drawerType === 'vitals-trend' && 'Physiological Vitals Trend'}
+                    {drawerType === 'body-map' && 'Interactive Anatomical Body Map'}
+                    {drawerType === 'mist-full' && 'Complete MIST Handover Report'}
+                  </h3>
+                  <p className="text-xs text-slate-400 font-sans mt-0.5">
+                    Patient: {currentRun.patient.name ?? 'Unknown Male'} · Unit {currentRun.callsign}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDrawerType('none')}
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Drawer Content */}
+              <div className="p-6 overflow-y-auto flex-1">
+                {/* 1. Vitals Trend Table */}
+                {drawerType === 'vitals-trend' && (
+                  <div className="space-y-4">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-slate-400 uppercase text-[10px]">
+                          <th className="py-2">Time</th>
+                          <th className="py-2">Source</th>
+                          <th className="py-2">HR (bpm)</th>
+                          <th className="py-2">BP (mmHg)</th>
+                          <th className="py-2">SpO₂ (%)</th>
+                          <th className="py-2">RR (/min)</th>
+                          <th className="py-2">GCS</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {vitalsList.map((v) => (
+                          <tr key={v.id} className="hover:bg-slate-50">
+                            <td className="py-3 font-semibold text-slate-900">{formatClockTime(v.timestamp)}</td>
+                            <td className="py-3 text-slate-500 font-sans text-xs">{v.assessedBy ?? v.source}</td>
+                            <td className="py-3 font-bold text-slate-900">{v.hr?.value ?? '—'}</td>
+                            <td className="py-3 font-bold text-slate-900">{v.sbp?.value ?? '—'}/{v.dbp?.value ?? '—'}</td>
+                            <td className="py-3 font-bold text-slate-900">{v.spo2?.value ?? '—'}%</td>
+                            <td className="py-3 font-bold text-slate-900">{v.rr?.value ?? '—'}</td>
+                            <td className="py-3 font-bold text-sky-700">{v.gcs?.total ?? '—'}/15</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* 2. Body Map Modal */}
+                {drawerType === 'body-map' && (
+                  <div className="space-y-4">
+                    <InjuryMap
+                      injuries={currentRun.injuries}
+                      onAdd={() => {}}
+                      onRemove={() => {}}
+                      nightMode={false}
+                    />
+                  </div>
+                )}
+
+                {/* 3. Full MIST Protocol Modal */}
+                {drawerType === 'mist-full' && (
+                  <div className="space-y-4 text-xs font-sans">
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                      <span className="font-mono text-xs font-bold text-sky-700 uppercase">M · Mechanism of Injury</span>
+                      <p className="text-slate-800 leading-relaxed font-mono">
+                        {currentRun.mist?.mechanism ?? currentRun.incident.mechanism}
+                      </p>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                      <span className="font-mono text-xs font-bold text-red-700 uppercase">I · Injuries Found</span>
+                      <p className="text-slate-800 leading-relaxed font-mono whitespace-pre-line">
+                        {currentRun.mist?.injuries ?? 'Pelvic instability, scalp laceration'}
+                      </p>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                      <span className="font-mono text-xs font-bold text-amber-700 uppercase">S · Signs & Vital Readings</span>
+                      <p className="text-slate-800 leading-relaxed font-mono">
+                        {currentRun.mist?.signs ?? 'HR 112, BP 98/64, SpO2 97%, GCS 14'}
+                      </p>
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                      <span className="font-mono text-xs font-bold text-emerald-700 uppercase">T · Treatment Given</span>
+                      <p className="text-slate-800 leading-relaxed font-mono whitespace-pre-line">
+                        {currentRun.mist?.treatment ?? 'Oxygen, IV fluids, pelvic binder'}
+                      </p>
+                    </div>
+
+                    <div className="pt-2 flex items-center justify-between text-slate-400 font-mono text-[11px]">
+                      <span>Confirmed by: {currentRun.mist?.confirmedBy ?? 'Para. J. Chen'}</span>
+                      <span>Timestamp: {formatClockTime(currentRun.mist?.confirmedAt)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Drawer Footer */}
+              <div className="p-4 border-t border-slate-100 flex justify-end">
+                <Button
+                  size="md"
+                  variant="secondary"
+                  onClick={() => setDrawerType('none')}
+                  className="rounded-xl font-bold text-xs"
+                >
+                  Close Window
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
