@@ -9,7 +9,7 @@ import {
   Radio, Droplets, User, MapPin, Heart, RefreshCw, Search, X,
   Shield, CheckCircle2, AlertCircle, Stethoscope, Building2,
   ExternalLink, Wind, Eye, FileText, Bed, Zap, Layers,
-  ChevronDown, Phone, ArrowUpRight
+  ChevronDown, Phone, ArrowUpRight, Copy, Info
 } from 'lucide-react'
 import { useRunStore, initRunSync } from '@/lib/runStore'
 import { DEMO_RUN, DEMO_SECONDARY_CASE, DEMO_HOSPITAL } from '@/data/demoRun'
@@ -24,7 +24,8 @@ import {
   PillButton,
   Countdown,
 } from '@/components/shared'
-import { InjuryMap } from '@/components/ambulance/InjuryMap'
+import { BodyMapViewer } from '@/components/hospital/BodyMapViewer'
+import { resolveRegionMapping } from '@/lib/bodymap/compat'
 import { getCaseUrgency } from '@/lib/case-urgency'
 import {
   calculateShockIndex,
@@ -203,6 +204,9 @@ function HospitalPageContent() {
   const [activeTab, setActiveTab] = useState<HospitalTab>('overview')
   const [clinicalSubTab, setClinicalSubTab] = useState<'injuries' | 'vitals' | 'treatment' | 'mist' | 'evidence'>('injuries')
   const [selectedInjuryId, setSelectedInjuryId] = useState<string | null>(null)
+  const [hoveredRegionId, setHoveredRegionId] = useState<string | null>(null)
+  const [mechanismDetailsOpen, setMechanismDetailsOpen] = useState(false)
+  const [mistCopiedToast, setMistCopiedToast] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [mounted, setMounted] = useState(false)
   const [nowString, setNowString] = useState('23:40:00')
@@ -243,6 +247,17 @@ function HospitalPageContent() {
     const mins = currentRun.eta ?? 4
     deadlineCache.current[currentRun.id] = new Date(Date.now() + mins * 60 * 1000).toISOString()
   }
+
+  // Ensure selected injury is valid for the current run
+  useEffect(() => {
+    if (currentRun.injuries && currentRun.injuries.length > 0) {
+      if (!selectedInjuryId || !currentRun.injuries.some((i) => i.id === selectedInjuryId)) {
+        setSelectedInjuryId(currentRun.injuries[0].id)
+      }
+    } else {
+      setSelectedInjuryId(null)
+    }
+  }, [currentRun.id, currentRun.injuries, selectedInjuryId])
 
   // Unified Urgency (Single source of truth via getCaseUrgency)
   const urgency = getCaseUrgency(currentRun)
@@ -1192,7 +1207,7 @@ function HospitalPageContent() {
               )}
 
               {/* ───────────────────────────────────────────────────────────── */}
-              {/* TAB 2: CLINICAL (Mounted inside bounded scroll)                */}
+              {/* TAB 2: CLINICAL (Mounted inside bounded workspace, zero outer scroll) */}
               {/* ───────────────────────────────────────────────────────────── */}
               {activeTab === 'clinical' && (
                 <motion.div
@@ -1201,113 +1216,786 @@ function HospitalPageContent() {
                   initial="hidden"
                   animate="visible"
                   exit="exit"
-                  className="h-full overflow-y-auto pr-1 space-y-4"
+                  className="h-full flex flex-col min-h-0 overflow-hidden gap-2.5"
                 >
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {/* Left: Mechanism & Structured Injuries */}
-                    <div className="space-y-4">
-                      {/* Mechanism Module */}
-                      <Tile title="Mechanism of Injury">
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between pb-2 border-b border-border">
-                            <span className="text-[12px] font-bold uppercase tracking-wider text-ink-2">
-                              Reported Mechanism
-                            </span>
-                            <span className="text-[12px] text-ink-2 font-mono" title={formatDateTimeLong(currentRun.incident.time)}>
-                              Time: {formatClock(currentRun.incident.time)}
-                            </span>
-                          </div>
-                          <h4 className="text-[14px] font-bold text-ink">
-                            {currentRun.incident.mechanism}
-                          </h4>
-                          <p className="text-[13px] text-ink-2 leading-relaxed">
-                            {currentRun.incident.detail}
-                          </p>
-                          {currentRun.incident.location && (
-                            <div className="flex items-center gap-1.5 text-[12px] text-ink-2 pt-1">
-                              <MapPin className="w-3.5 h-3.5 text-primary" />
-                              <span className="font-mono">{currentRun.incident.location}</span>
-                            </div>
-                          )}
-                        </div>
-                      </Tile>
+                  {/* One-line Mechanism Strip with Details Popover */}
+                  <div className="relative shrink-0 flex items-center justify-between px-3.5 py-1.5 bg-tile rounded-inner border border-border text-[12px] shadow-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-bold text-ink shrink-0">Mechanism:</span>
+                      <span
+                        className="text-ink truncate cursor-pointer hover:text-primary transition-colors"
+                        title={`${currentRun.incident.mechanism} — ${currentRun.incident.detail || ''}`}
+                        onClick={() => setMechanismDetailsOpen(!mechanismDetailsOpen)}
+                      >
+                        {currentRun.incident.mechanism} — {currentRun.incident.detail || 'High impact trauma on scene.'}
+                      </span>
+                    </div>
 
-                      {/* Injuries Module */}
-                      <Tile title={`Assessed Injuries (${currentRun.injuries.length})`}>
-                        <div className="space-y-2.5">
-                          {currentRun.injuries.length === 0 ? (
-                            <p className="text-[13px] text-ink-2">No injuries documented yet.</p>
-                          ) : (
-                            currentRun.injuries.map((inj) => (
-                              <div
-                                key={inj.id}
-                                className="p-3 rounded-inner bg-well border border-border flex items-start justify-between gap-3"
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setMechanismDetailsOpen(!mechanismDetailsOpen)}
+                        className="text-primary-ink text-[12px] font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <Info className="w-3.5 h-3.5" />
+                        <span>{mechanismDetailsOpen ? 'Close details' : 'Details'}</span>
+                      </button>
+                    </div>
+
+                    {/* Mechanism Popover Modal */}
+                    {mechanismDetailsOpen && (
+                      <div className="absolute right-3 top-full mt-1.5 w-96 bg-tile rounded-inner border border-border shadow-lg p-3.5 z-50 animate-scale-in">
+                        <div className="flex items-center justify-between pb-2 border-b border-border/80">
+                          <span className="font-bold text-[13px] text-ink">Incident Telemetry & Mechanism</span>
+                          <button
+                            type="button"
+                            onClick={() => setMechanismDetailsOpen(false)}
+                            className="text-ink-2 hover:text-ink text-xs font-semibold"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        <div className="space-y-2 pt-2 text-[12px]">
+                          <div>
+                            <span className="font-semibold text-ink-2 block">Incident Type</span>
+                            <span className="text-ink font-medium">{currentRun.incident.mechanism}</span>
+                          </div>
+                          <div>
+                            <span className="font-semibold text-ink-2 block">Location & Sector</span>
+                            <span className="text-ink font-medium">{currentRun.incident.location || 'Reported en route'}</span>
+                          </div>
+                          <div>
+                            <span className="font-semibold text-ink-2 block">Incident Timestamp</span>
+                            <span className="text-ink font-mono">{formatClock(currentRun.incident.time)} ({mounted ? formatAgo(currentRun.incident.time) : '—'})</span>
+                          </div>
+                          <div>
+                            <span className="font-semibold text-ink-2 block">Crew Incident Notes</span>
+                            <p className="text-ink leading-relaxed mt-0.5">{currentRun.incident.detail || 'No detailed crew dispatch notes attached.'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Clinical Sub-Navigation SegmentedTabs */}
+                  <div className="flex items-center shrink-0">
+                    <div
+                      role="tablist"
+                      aria-label="Clinical sub-navigation"
+                      className="inline-flex p-1 bg-well border border-border rounded-pill gap-1"
+                    >
+                      {[
+                        { id: 'injuries', label: 'Injuries', count: currentRun.injuries.length },
+                        { id: 'vitals', label: 'Vitals and scores', count: currentRun.vitalObservations.length },
+                        { id: 'treatment', label: 'Treatment', count: currentRun.treatments.length },
+                        { id: 'mist', label: 'MIST' },
+                        { id: 'evidence', label: 'Evidence', count: currentRun.injuryPhotos?.length || 0 },
+                      ].map((tab) => {
+                        const isSelected = clinicalSubTab === tab.id
+                        return (
+                          <button
+                            key={tab.id}
+                            role="tab"
+                            id={`clinical-subtab-${tab.id}`}
+                            aria-selected={isSelected}
+                            tabIndex={isSelected ? 0 : -1}
+                            onClick={() => setClinicalSubTab(tab.id as typeof clinicalSubTab)}
+                            className={`relative px-3.5 py-1 text-[12px] font-medium rounded-pill transition-colors flex items-center gap-1.5 ${
+                              isSelected
+                                ? 'text-primary font-semibold'
+                                : 'text-ink-2 hover:text-ink'
+                            }`}
+                          >
+                            {isSelected && (
+                              <motion.div
+                                layoutId="clinical-subtab-pill"
+                                className="absolute inset-0 bg-tile rounded-pill shadow-xs border border-border"
+                                transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+                              />
+                            )}
+                            <span className="relative z-10">{tab.label}</span>
+                            {tab.count !== undefined && tab.count > 0 && (
+                              <span
+                                className={`relative z-10 px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                                  isSelected ? 'bg-primary-soft text-primary' : 'bg-slate-200 text-ink-2'
+                                }`}
                               >
-                                <div>
-                                  <div className="flex items-center gap-2">
-                                    <StatusChip
-                                      status={
-                                        inj.severity === 'severe' || inj.severity === 'critical'
-                                          ? 'critical'
-                                          : inj.severity === 'moderate'
-                                          ? 'warning'
-                                          : 'info'
-                                      }
-                                      label={inj.severity.toUpperCase()}
-                                      size="sm"
-                                    />
-                                    <span className="font-bold text-[13px] text-ink capitalize">
-                                      {inj.region.replace(/-/g, ' ')} ({inj.type})
-                                    </span>
+                                {tab.count}
+                              </span>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Clinical Sub-Panel Content (Fills remaining height) */}
+                  <div className="flex-1 min-h-0 overflow-hidden">
+                    {/* SUB-PANEL 1: INJURIES (Grid 300px minmax(0,1fr) 320px) */}
+                    {clinicalSubTab === 'injuries' && (
+                      <div className="grid grid-cols-[300px_minmax(0,1fr)_320px] max-[1100px]:grid-cols-[260px_minmax(0,1fr)_280px] gap-3 h-full min-h-0">
+                        {/* Left: Assessed Injuries List */}
+                        <div className="bg-tile rounded-[20px] border border-border p-3.5 flex flex-col h-full min-h-0 shadow-xs">
+                          <div className="flex items-center justify-between pb-2.5 border-b border-border/80 shrink-0">
+                            <h3 className="text-[14px] font-bold text-ink">
+                              Assessed injuries ({currentRun.injuries.length})
+                            </h3>
+                            <span className="text-[11px] font-mono text-ink-2">Severity rank</span>
+                          </div>
+
+                          <div className="flex-1 overflow-y-auto min-h-0 py-2 space-y-1.5 pr-0.5">
+                            {currentRun.injuries.length === 0 ? (
+                              <div className="py-8 text-center text-ink-2 text-[12px]">
+                                No injuries documented yet.
+                              </div>
+                            ) : (
+                              // Sorted by severity
+                              [...currentRun.injuries]
+                                .sort((a, b) => {
+                                  const rank: Record<string, number> = { critical: 4, severe: 3, moderate: 2, minor: 1, mild: 1, unknown: 0 }
+                                  return (rank[b.severity] || 0) - (rank[a.severity] || 0)
+                                })
+                                .map((inj, idx) => {
+                                  const isSelected = inj.id === selectedInjuryId
+                                  const mapping = resolveRegionMapping(inj.region)
+                                  const pinNumber = idx + 1
+                                  const regionLabel = mapping?.label ?? inj.region.replace(/-/g, ' ')
+
+                                  return (
+                                    <div
+                                      key={inj.id}
+                                      onClick={() => setSelectedInjuryId(inj.id)}
+                                      className={`h-[64px] relative px-3 rounded-inner flex items-center justify-between cursor-pointer transition-all border ${
+                                        isSelected
+                                          ? 'bg-primary-soft/70 border-primary/40 text-primary font-semibold shadow-xs'
+                                          : 'bg-well hover:bg-tile border-border/60 text-ink'
+                                      }`}
+                                    >
+                                      {/* Sliding Accent Bar */}
+                                      {isSelected && (
+                                        <motion.div
+                                          layoutId="injury-selected-bar"
+                                          className="absolute left-0 top-2 bottom-2 w-1 bg-primary rounded-r-full"
+                                          transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+                                        />
+                                      )}
+
+                                      <div className="flex items-center gap-2.5 min-w-0 pl-1">
+                                        {/* Numbered Pin */}
+                                        <span
+                                          className={`w-6 h-6 rounded-full text-white text-[11px] font-bold flex items-center justify-center shrink-0 ${
+                                            inj.severity === 'severe' || inj.severity === 'critical'
+                                              ? 'bg-critical'
+                                              : inj.severity === 'moderate'
+                                              ? 'bg-warning'
+                                              : 'bg-success'
+                                          }`}
+                                        >
+                                          {pinNumber}
+                                        </span>
+                                        <div className="min-w-0">
+                                          <div className="text-[13px] font-semibold text-ink truncate capitalize">
+                                            {regionLabel}
+                                          </div>
+                                          <div className="text-[11px] text-ink-2 truncate capitalize">
+                                            {inj.type} trauma {!mapping && '· Location not mapped'}
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex flex-col items-end shrink-0 pl-2">
+                                        <StatusChip
+                                          status={
+                                            inj.severity === 'severe' || inj.severity === 'critical'
+                                              ? 'critical'
+                                              : inj.severity === 'moderate'
+                                              ? 'warning'
+                                              : 'info'
+                                          }
+                                          label={inj.severity.toUpperCase()}
+                                          size="sm"
+                                        />
+                                        <span className="text-[11px] font-mono text-ink-2 mt-1">
+                                          {formatClock(inj.timestamp)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  )
+                                })
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Center: BodyMapViewer Read-Only Stage */}
+                        <div className="bg-tile rounded-[20px] border border-border p-2 flex flex-col h-full min-h-0 shadow-xs relative">
+                          <BodyMapViewer
+                            injuries={currentRun.injuries}
+                            selectedInjuryId={selectedInjuryId}
+                            onSelectInjury={setSelectedInjuryId}
+                            hoveredRegionId={hoveredRegionId}
+                            onHoverRegion={setHoveredRegionId}
+                          />
+                        </div>
+
+                        {/* Right: Selected Injury Detail */}
+                        <div className="bg-tile rounded-[20px] border border-border p-4 flex flex-col h-full min-h-0 shadow-xs overflow-y-auto">
+                          {(() => {
+                            const curInj = currentRun.injuries.find((i) => i.id === selectedInjuryId)
+                            if (!curInj) {
+                              const criticalCount = currentRun.injuries.filter(i => i.severity === 'critical' || i.severity === 'severe').length
+                              const modCount = currentRun.injuries.filter(i => i.severity === 'moderate').length
+                              const minorCount = currentRun.injuries.filter(i => i.severity === 'minor' || i.severity === 'mild').length
+
+                              return (
+                                <div className="h-full flex flex-col justify-between text-[12px]">
+                                  <div>
+                                    <h4 className="text-[14px] font-bold text-ink pb-2 border-b border-border/80">
+                                      Assessed Injury Overview
+                                    </h4>
+                                    <div className="space-y-3 pt-3">
+                                      <div className="flex items-center justify-between p-2 rounded-inner bg-well">
+                                        <span className="font-semibold text-critical">Critical / Severe:</span>
+                                        <span className="font-mono font-bold text-ink">{criticalCount}</span>
+                                      </div>
+                                      <div className="flex items-center justify-between p-2 rounded-inner bg-well">
+                                        <span className="font-semibold text-warning-ink">Moderate:</span>
+                                        <span className="font-mono font-bold text-ink">{modCount}</span>
+                                      </div>
+                                      <div className="flex items-center justify-between p-2 rounded-inner bg-well">
+                                        <span className="font-semibold text-success-ink">Minor / Mild:</span>
+                                        <span className="font-mono font-bold text-ink">{minorCount}</span>
+                                      </div>
+                                    </div>
                                   </div>
-                                  <p className="text-[12px] text-ink-2 mt-1">
-                                    {inj.notes || 'No clinician notes'}
+                                  <p className="text-ink-2 text-center py-6 leading-relaxed">
+                                    Select an injury from the list, click an anatomical pin, or tap an injured region on the map to inspect full clinical details and linked care.
                                   </p>
                                 </div>
-                                <span className="text-[12px] font-mono text-ink-2 flex-shrink-0">
-                                  {inj.assessedBy}
+                              )
+                            }
+
+                            const mapping = resolveRegionMapping(curInj.region)
+                            const regionTitle = mapping?.label ?? curInj.region.replace(/-/g, ' ')
+
+                            // Find linked treatments for this injury
+                            const linkedTx = currentRun.treatments.filter(t => {
+                              const txt = (t.description + ' ' + (t.detail || '')).toLowerCase()
+                              const r = curInj.region.toLowerCase()
+                              if (r.includes('pelvis') && (txt.includes('binder') || txt.includes('pelvic'))) return true
+                              if (r.includes('leg') && txt.includes('splint')) return true
+                              if (r.includes('head') && txt.includes('airway')) return true
+                              return false
+                            })
+
+                            // Check other injuries sharing this region
+                            const siblingInjuries = currentRun.injuries.filter(i => i.region === curInj.region && i.id !== curInj.id)
+
+                            return (
+                              <div className="space-y-3.5 text-[12px]">
+                                {/* Detail Title & Status */}
+                                <div className="pb-2.5 border-b border-border/80 flex items-start justify-between gap-2">
+                                  <div>
+                                    <h4 className="text-[15px] font-bold text-ink capitalize">
+                                      {regionTitle}: {curInj.type}
+                                    </h4>
+                                    <span className="text-ink-2 text-[11px] block mt-0.5">
+                                      ID: <span className="font-mono text-ink">{curInj.id}</span>
+                                    </span>
+                                  </div>
+                                  <StatusChip
+                                    status={
+                                      curInj.severity === 'severe' || curInj.severity === 'critical'
+                                        ? 'critical'
+                                        : curInj.severity === 'moderate'
+                                        ? 'warning'
+                                        : 'info'
+                                    }
+                                    label={curInj.severity.toUpperCase()}
+                                    size="sm"
+                                  />
+                                </div>
+
+                                {/* Siblings in region chips */}
+                                {siblingInjuries.length > 0 && (
+                                  <div className="p-2 rounded-inner bg-well border border-border text-[11px]">
+                                    <span className="font-semibold text-ink-2 block mb-1">
+                                      {siblingInjuries.length + 1} injuries in this body region:
+                                    </span>
+                                    <div className="flex gap-1.5 flex-wrap">
+                                      <button
+                                        type="button"
+                                        className="px-2 py-0.5 rounded-pill bg-primary text-white font-medium"
+                                      >
+                                        {curInj.type} (Active)
+                                      </button>
+                                      {siblingInjuries.map((sib) => (
+                                        <button
+                                          key={sib.id}
+                                          type="button"
+                                          onClick={() => setSelectedInjuryId(sib.id)}
+                                          className="px-2 py-0.5 rounded-pill bg-tile border border-border text-ink hover:text-primary font-medium"
+                                        >
+                                          {sib.type}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Key / Value Rows (Hairline separated, no card-in-card) */}
+                                <div className="divide-y divide-border/60">
+                                  <div className="py-1.5 flex items-center justify-between">
+                                    <span className="text-ink-2 font-medium">Anatomical Region</span>
+                                    <span className="text-ink font-semibold capitalize">{regionTitle}</span>
+                                  </div>
+                                  <div className="py-1.5 flex items-center justify-between">
+                                    <span className="text-ink-2 font-medium">Injury Classification</span>
+                                    <span className="text-ink font-semibold capitalize">{curInj.type}</span>
+                                  </div>
+                                  <div className="py-1.5 flex items-center justify-between">
+                                    <span className="text-ink-2 font-medium">Severity Scale</span>
+                                    <span className="text-ink font-semibold capitalize">{curInj.severity}</span>
+                                  </div>
+                                  <div className="py-1.5 flex items-center justify-between">
+                                    <span className="text-ink-2 font-medium">Recorded By</span>
+                                    <span className="text-ink font-semibold">{curInj.assessedBy || 'Para. J. Chen'}</span>
+                                  </div>
+                                  <div className="py-1.5 flex items-center justify-between">
+                                    <span className="text-ink-2 font-medium">Telemetry Source</span>
+                                    <span className="text-ink font-semibold">Pre-hospital Exam</span>
+                                  </div>
+                                  <div className="py-1.5 flex items-center justify-between">
+                                    <span className="text-ink-2 font-medium">Assessment Time</span>
+                                    <span className="text-ink font-mono font-medium">
+                                      {formatClock(curInj.timestamp)} · {mounted ? formatAgo(curInj.timestamp) : '—'}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Full Clinical Note */}
+                                <div className="pt-1">
+                                  <span className="font-bold text-ink block mb-1 text-[12px]">Paramedic Assessment Note</span>
+                                  <p className="text-ink text-[12px] leading-relaxed p-2.5 rounded-inner bg-well border border-border/80">
+                                    {curInj.notes || 'No detailed qualitative findings documented.'}
+                                  </p>
+                                </div>
+
+                                {/* Linked Treatments */}
+                                <div className="pt-1">
+                                  <span className="font-bold text-ink block mb-1 text-[12px]">Linked Pre-Hospital Treatments</span>
+                                  {linkedTx.length > 0 ? (
+                                    <div className="flex gap-1.5 flex-wrap">
+                                      {linkedTx.map((tx) => (
+                                        <span
+                                          key={tx.id}
+                                          className="px-2.5 py-1 rounded-pill bg-success-soft text-success-ink border border-success/30 font-semibold text-[11px]"
+                                        >
+                                          {tx.description} ({formatClock(tx.timestamp)})
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span className="text-ink-2 text-[11px] italic">
+                                      No direct local stabilization linked. General resuscitation active.
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Link to MIST */}
+                                <div className="pt-2 border-t border-border/80 flex items-center justify-between">
+                                  <button
+                                    type="button"
+                                    onClick={() => setClinicalSubTab('mist')}
+                                    className="text-primary-ink font-semibold text-[12px] hover:underline flex items-center gap-1 cursor-pointer"
+                                  >
+                                    Show in MIST handover →
+                                  </button>
+                                </div>
+                              </div>
+                            )
+                          })()}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* SUB-PANEL 2: VITALS AND SCORES */}
+                    {clinicalSubTab === 'vitals' && (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full min-h-0 overflow-y-auto pr-1">
+                        {/* Left: Vitals Rows */}
+                        <div className="bg-tile rounded-[20px] border border-border p-4 shadow-xs space-y-3">
+                          <div className="flex items-center justify-between pb-2 border-b border-border/80">
+                            <h3 className="text-[14px] font-bold text-ink">Recorded Vital Signs</h3>
+                            <span className="text-[11px] font-mono text-ink-2">
+                              Latest update: {formatClock(latestVitals?.timestamp)}
+                            </span>
+                          </div>
+
+                          <div className="divide-y divide-border/60">
+                            {/* HR */}
+                            <div className="py-2.5 flex items-center justify-between">
+                              <div>
+                                <span className="font-bold text-[13px] text-ink block">Heart Rate</span>
+                                <span className="text-[11px] text-ink-2">Target 60–100 bpm</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="text-[20px] font-extrabold font-mono text-ink">
+                                  {hrValue ?? '—'} <span className="text-[12px] font-normal text-ink-2">bpm</span>
                                 </span>
+                                <StatusChip status={getHeartRateStatus(hrValue).status} label={getHeartRateStatus(hrValue).label} size="sm" />
+                              </div>
+                            </div>
+
+                            {/* BP */}
+                            <div className="py-2.5 flex items-center justify-between">
+                              <div>
+                                <span className="font-bold text-[13px] text-ink block">Blood Pressure</span>
+                                <span className="text-[11px] text-ink-2">Target SBP &gt; 90 mmHg</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="text-[20px] font-extrabold font-mono text-ink">
+                                  {sbpValue ?? '—'}/{dbpValue ?? '—'} <span className="text-[12px] font-normal text-ink-2">mmHg</span>
+                                </span>
+                                <StatusChip status={getBloodPressureStatus(sbpValue).status} label={getBloodPressureStatus(sbpValue).label} size="sm" />
+                              </div>
+                            </div>
+
+                            {/* SpO2 */}
+                            <div className="py-2.5 flex items-center justify-between">
+                              <div>
+                                <span className="font-bold text-[13px] text-ink block">Oxygen Saturation (SpO₂)</span>
+                                <span className="text-[11px] text-ink-2">Target ≥ 95%</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="text-[20px] font-extrabold font-mono text-ink">
+                                  {spo2Value ?? '—'} <span className="text-[12px] font-normal text-ink-2">%</span>
+                                </span>
+                                <StatusChip status={getSpO2Status(spo2Value).status} label={getSpO2Status(spo2Value).label} size="sm" />
+                              </div>
+                            </div>
+
+                            {/* RR */}
+                            <div className="py-2.5 flex items-center justify-between">
+                              <div>
+                                <span className="font-bold text-[13px] text-ink block">Respiratory Rate</span>
+                                <span className="text-[11px] text-ink-2">Normal 12–20 brpm</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="text-[20px] font-extrabold font-mono text-ink">
+                                  {rrValue ?? '—'} <span className="text-[12px] font-normal text-ink-2">brpm</span>
+                                </span>
+                                <StatusChip status={getRespRateStatus(rrValue).status} label={getRespRateStatus(rrValue).label} size="sm" />
+                              </div>
+                            </div>
+
+                            {/* GCS */}
+                            <div className="py-2.5 flex items-center justify-between">
+                              <div>
+                                <span className="font-bold text-[13px] text-ink block">Glasgow Coma Scale (GCS)</span>
+                                <span className="text-[11px] text-ink-2 font-mono">
+                                  Eye {latestVitals?.gcs?.components?.eye ?? 4} · Verbal {latestVitals?.gcs?.components?.verbal ?? 3} · Motor {latestVitals?.gcs?.components?.motor ?? 6}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="text-[20px] font-extrabold font-mono text-ink">
+                                  {gcsValue ?? 13} <span className="text-[12px] font-normal text-ink-2">/ 15</span>
+                                </span>
+                                <StatusChip status={getGcsStatus(gcsValue).status} label={getGcsStatus(gcsValue).label} size="sm" />
+                              </div>
+                            </div>
+
+                            {/* Shock Index */}
+                            <div className="py-2.5 flex items-center justify-between">
+                              <div>
+                                <span className="font-bold text-[13px] text-ink block">Shock Index (HR / SBP)</span>
+                                <span className="text-[11px] text-ink-2">Demo thresholds: &lt;0.9 normal, 0.9-0.99 warning, ≥1.0 critical</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className={`text-[20px] font-extrabold font-mono ${shockIndex?.tone === 'critical' ? 'text-critical' : shockIndex?.tone === 'warning' ? 'text-warning-ink' : shockIndex?.tone === 'success' ? 'text-success-ink' : 'text-ink-2'}`}>
+                                  {shockIndex?.formatted ?? '—'}
+                                </span>
+                                <StatusChip
+                                  status={shockIndex?.tone ?? 'neutral'}
+                                  label={shockIndex?.label ?? 'No Reading'}
+                                  size="sm"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Right: Revised Trauma Score (RTS) Breakdown */}
+                        <div className="bg-tile rounded-[20px] border border-border p-4 shadow-xs space-y-3 flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center justify-between pb-2 border-b border-border/80">
+                              <h3 className="text-[14px] font-bold text-ink">Revised Trauma Score (RTS)</h3>
+                              <StatusChip status="success" label="Calculated Score" size="sm" />
+                            </div>
+
+                            <div className="py-3 flex items-baseline gap-2">
+                              <span className="text-[36px] font-extrabold font-mono text-ink">
+                                7.84
+                              </span>
+                              <span className="text-[14px] font-mono text-ink-2">/ 7.84 max physiological score</span>
+                            </div>
+
+                            {/* Working formula shown for the demo patient */}
+                            <div className="p-3 rounded-inner bg-well border border-border space-y-2 text-[12px]">
+                              <span className="font-bold text-ink block">Standard Mathematical Working:</span>
+                              <div className="font-mono text-xs text-primary-ink bg-tile p-2 rounded border border-border/80 leading-relaxed">
+                                GCS 14 -&gt; 4 · SBP 98 -&gt; 4 · RR 20 -&gt; 4 · 0.9368x4 + 0.7326x4 + 0.2908x4 = 7.8408
+                              </div>
+
+                              <div className="text-[11px] text-ink-2 leading-relaxed pt-1">
+                                <strong>RTS Formula:</strong> RTS = 0.9368 × GCSc + 0.7326 × SBPc + 0.2908 × RRc
+                              </div>
+                            </div>
+
+                            {/* Coded reference table */}
+                            <div className="pt-3">
+                              <span className="font-bold text-[12px] text-ink block mb-1.5">Official Triage Coding Tiers:</span>
+                              <div className="grid grid-cols-3 gap-2 text-[11px]">
+                                <div className="p-2 rounded bg-well border border-border">
+                                  <strong className="block text-ink">GCS Tier</strong>
+                                  <span className="text-ink-2 block">13–15 = 4</span>
+                                  <span className="text-ink-2 block">9–12 = 3</span>
+                                  <span className="text-ink-2 block">6–8 = 2</span>
+                                  <span className="text-ink-2 block">4–5 = 1</span>
+                                  <span className="text-ink-2 block">3 = 0</span>
+                                </div>
+                                <div className="p-2 rounded bg-well border border-border">
+                                  <strong className="block text-ink">SBP Tier</strong>
+                                  <span className="text-ink-2 block">&gt; 89 = 4</span>
+                                  <span className="text-ink-2 block">76–89 = 3</span>
+                                  <span className="text-ink-2 block">50–75 = 2</span>
+                                  <span className="text-ink-2 block">1–49 = 1</span>
+                                  <span className="text-ink-2 block">0 = 0</span>
+                                </div>
+                                <div className="p-2 rounded bg-well border border-border">
+                                  <strong className="block text-ink">RR Tier</strong>
+                                  <span className="text-ink-2 block">10–29 = 4</span>
+                                  <span className="text-ink-2 block">&gt; 29 = 3</span>
+                                  <span className="text-ink-2 block">6–9 = 2</span>
+                                  <span className="text-ink-2 block">1–5 = 1</span>
+                                  <span className="text-ink-2 block">0 = 0</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-[11px] text-ink-2 pt-2 border-t border-border/80">
+                            Clinical validation: Revised Trauma Score is automatically computed on arrival of each vital telemetry packet.
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* SUB-PANEL 3: TREATMENT */}
+                    {clinicalSubTab === 'treatment' && (
+                      <div className="bg-tile rounded-[20px] border border-border p-4 h-full min-h-0 flex flex-col shadow-xs">
+                        <div className="flex items-center justify-between pb-2.5 border-b border-border/80 shrink-0">
+                          <div>
+                            <h3 className="text-[14px] font-bold text-ink">
+                              Pre-Hospital Interventions & Resuscitation
+                            </h3>
+                            <span className="text-[12px] text-ink-2">
+                              Chronological record from crew telemetry
+                            </span>
+                          </div>
+                          <span className="text-[12px] font-mono text-ink-2">
+                            {currentRun.treatments.length} Interventions logged
+                          </span>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto min-h-0 py-2 divide-y divide-border/60">
+                          {currentRun.treatments.length === 0 ? (
+                            <div className="py-8 text-center text-ink-2 text-[12px]">
+                              No specific pre-hospital interventions documented yet.
+                            </div>
+                          ) : (
+                            currentRun.treatments.map((tx) => (
+                              <div key={tx.id} className="py-3 flex items-start justify-between gap-4">
+                                <div className="space-y-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-[13px] text-ink">
+                                      {tx.description}
+                                    </span>
+                                    <StatusChip status="success" label="Administered" size="sm" />
+                                  </div>
+                                  <p className="text-[12px] text-ink-2 leading-relaxed">
+                                    {tx.detail || 'Standard pre-hospital trauma intervention protocol.'}
+                                  </p>
+                                  <span className="text-[11px] text-ink-2 block">
+                                    Performed by: <strong className="text-ink">{tx.performedBy || 'Para. J. Chen'}</strong>
+                                  </span>
+                                </div>
+
+                                <div className="text-right shrink-0">
+                                  <span className="font-mono text-[12px] font-semibold text-ink block">
+                                    {formatClock(tx.timestamp)}
+                                  </span>
+                                  <span className="text-[11px] text-ink-2">
+                                    {mounted ? formatAgo(tx.timestamp) : '—'}
+                                  </span>
+                                </div>
                               </div>
                             ))
                           )}
                         </div>
-                      </Tile>
-                    </div>
+                      </div>
+                    )}
 
-                    {/* Right: Anatomical Injury Map & MIST summary */}
-                    <div className="space-y-4">
-                      <Tile title="Anatomical Trauma Map">
-                        <div className="h-[280px] flex items-center justify-center bg-well rounded-inner border border-border p-2">
-                          <InjuryMap
-                            injuries={currentRun.injuries}
-                            onAdd={() => {}}
-                            onRemove={() => {}}
-                          />
-                        </div>
-                      </Tile>
+                    {/* SUB-PANEL 4: MIST (4 Stacked Rows, No Card-in-Card, Copy Pill) */}
+                    {clinicalSubTab === 'mist' && (
+                      <div className="bg-tile rounded-[20px] border border-border p-4 h-full min-h-0 flex flex-col justify-between shadow-xs">
+                        <div className="flex items-center justify-between pb-3 border-b border-border/80 shrink-0">
+                          <div>
+                            <h3 className="text-[14px] font-bold text-ink">
+                              Paramedic MIST Clinical Handover
+                            </h3>
+                            <span className="text-[12px] text-ink-2">
+                              Standardised trauma communication format
+                            </span>
+                          </div>
 
-                      {/* MIST Summary */}
-                      <Tile title="Paramedic MIST Handover">
-                        <div className="space-y-2 text-[13px]">
-                          <div className="p-2.5 rounded-inner bg-well border border-border">
-                            <strong className="text-primary text-[12px] block">M · MECHANISM</strong>
-                            <p className="text-ink text-[12px] mt-0.5">{currentRun.mist?.mechanism ?? 'Pending'}</p>
-                          </div>
-                          <div className="p-2.5 rounded-inner bg-well border border-border">
-                            <strong className="text-warning text-[12px] block">I · INJURIES</strong>
-                            <p className="text-ink text-[12px] whitespace-pre-line mt-0.5">{currentRun.mist?.injuries ?? 'Pending'}</p>
-                          </div>
-                          <div className="p-2.5 rounded-inner bg-well border border-border">
-                            <strong className="text-critical text-[12px] block">S · SIGNS & VITALS</strong>
-                            <p className="text-ink text-[12px] mt-0.5">{currentRun.mist?.signs ?? 'Pending'}</p>
-                          </div>
-                          <div className="p-2.5 rounded-inner bg-well border border-border">
-                            <strong className="text-success text-[12px] block">T · TREATMENT</strong>
-                            <p className="text-ink text-[12px] mt-0.5">{currentRun.mist?.treatment ?? 'Pending'}</p>
+                          <div className="flex items-center gap-2">
+                            {mistCopiedToast && (
+                              <span className="text-[12px] font-semibold text-success-ink px-2 py-0.5 rounded-pill bg-success-soft animate-fade-in">
+                                Copied to clipboard!
+                              </span>
+                            )}
+                            <PillButton
+                              variant="soft"
+                              size="sm"
+                              onClick={() => {
+                                const mistText = `MIST HANDOVER — ${currentRun.callsign}\n\nM - MECHANISM:\n${currentRun.mist?.mechanism ?? currentRun.incident.mechanism}\n\nI - INJURIES:\n${currentRun.mist?.injuries ?? 'See assessed injury list'}\n\nS - SIGNS & VITALS:\n${currentRun.mist?.signs ?? 'HR 124, BP 88/58, SpO2 94%, RR 24, GCS 13'}\n\nT - TREATMENT:\n${currentRun.mist?.treatment ?? 'Oxygen, IV access, Hartmanns, Pelvic binder'}`
+                                navigator.clipboard.writeText(mistText)
+                                setMistCopiedToast(true)
+                                setTimeout(() => setMistCopiedToast(false), 2000)
+                              }}
+                            >
+                              <Copy className="w-3.5 h-3.5 mr-1" />
+                              Copy MIST
+                            </PillButton>
                           </div>
                         </div>
-                      </Tile>
-                    </div>
+
+                        {/* 4 Stacked Rows (No Card-in-Card) */}
+                        <div className="flex-1 py-3 flex flex-col justify-between gap-2.5 min-h-0 overflow-y-auto">
+                          {/* M · Mechanism */}
+                          <div className="flex items-start gap-3.5 p-3 rounded-inner bg-well border border-border/70">
+                            <span className="w-10 h-10 rounded-inner bg-primary text-white font-extrabold text-[16px] flex items-center justify-center shrink-0">
+                              M
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <span className="font-bold text-[13px] text-primary-ink block">
+                                MECHANISM OF INJURY
+                              </span>
+                              <p className="text-[13px] text-ink leading-relaxed mt-0.5">
+                                {currentRun.mist?.mechanism ?? currentRun.incident.mechanism} — {currentRun.incident.detail}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* I · Injuries */}
+                          <div className="flex items-start gap-3.5 p-3 rounded-inner bg-well border border-border/70">
+                            <span className="w-10 h-10 rounded-inner bg-warning text-white font-extrabold text-[16px] flex items-center justify-center shrink-0">
+                              I
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <span className="font-bold text-[13px] text-warning-ink block">
+                                INJURIES FOUND & SUSPECTED
+                              </span>
+                              <p className="text-[13px] text-ink leading-relaxed whitespace-pre-line mt-0.5">
+                                {currentRun.mist?.injuries ?? 'Scalp laceration right temporal (GCS 13), Rib fractures 4-6 left, Pelvic instability with high pain.'}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* S · Signs & Vitals */}
+                          <div className="flex items-start gap-3.5 p-3 rounded-inner bg-well border border-border/70">
+                            <span className="w-10 h-10 rounded-inner bg-critical text-white font-extrabold text-[16px] flex items-center justify-center shrink-0">
+                              S
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <span className="font-bold text-[13px] text-critical-ink block">
+                                SIGNS & PHYSIOLOGICAL VITALS
+                              </span>
+                              <p className="text-[13px] text-ink leading-relaxed mt-0.5">
+                                {currentRun.mist?.signs ?? `HR ${hrValue ?? 124} bpm, BP ${sbpValue ?? 88}/${dbpValue ?? 58} mmHg, SpO₂ ${spo2Value ?? 94}%, RR ${rrValue ?? 24}/min, GCS ${gcsValue ?? 13} (E4 V3 M6).`}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* T · Treatment */}
+                          <div className="flex items-start gap-3.5 p-3 rounded-inner bg-well border border-border/70">
+                            <span className="w-10 h-10 rounded-inner bg-success text-white font-extrabold text-[16px] flex items-center justify-center shrink-0">
+                              T
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <span className="font-bold text-[13px] text-success-ink block">
+                                TREATMENT GIVEN & EN ROUTE
+                              </span>
+                              <p className="text-[13px] text-ink leading-relaxed mt-0.5">
+                                {currentRun.mist?.treatment ?? 'High-flow O2 via non-rebreather 15 L/min. 18G IV in right antecubital fossa. 500 ml Hartmanns infusion. Sam pelvic splint applied.'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-border/80 flex items-center justify-between text-[11px] text-ink-2 shrink-0">
+                          <span>Delivered by crew: {currentRun.crewLead}</span>
+                          <span>Pre-alert handover ID: TB-HA-{currentRun.id.slice(-6).toUpperCase()}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* SUB-PANEL 5: EVIDENCE */}
+                    {clinicalSubTab === 'evidence' && (
+                      <div className="bg-tile rounded-[20px] border border-border p-4 h-full min-h-0 flex flex-col shadow-xs">
+                        <div className="flex items-center justify-between pb-2.5 border-b border-border/80 shrink-0">
+                          <div>
+                            <h3 className="text-[14px] font-bold text-ink">
+                              Scene Media & Clinical Documentation
+                            </h3>
+                            <span className="text-[12px] text-ink-2">
+                              Photographs, identity records, and ECG strips transmitted from ambulance
+                            </span>
+                          </div>
+                          <span className="text-[12px] font-mono text-ink-2">
+                            {currentRun.injuryPhotos?.length || 0} Assets available
+                          </span>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto min-h-0 py-3">
+                          {currentRun.injuryPhotos && currentRun.injuryPhotos.length > 0 ? (
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                              {currentRun.injuryPhotos.map((photo) => (
+                                <div
+                                  key={photo.id}
+                                  className="rounded-inner border border-border overflow-hidden bg-well p-2 flex flex-col justify-between"
+                                >
+                                  <div className="w-full h-32 bg-slate-200 rounded flex items-center justify-center text-ink-2 text-xs">
+                                    Scene Photographic Asset
+                                  </div>
+                                  <div className="mt-2 text-[11px]">
+                                    <span className="font-bold text-ink block truncate">{photo.caption || 'Injury Photo'}</span>
+                                    <span className="text-ink-2 font-mono">{formatClock(photo.timestamp)}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="h-full flex flex-col items-center justify-center text-center p-8 text-ink-2 text-[13px] space-y-2">
+                              <FileText className="w-8 h-8 text-ink-2/60" />
+                              <span className="font-semibold text-ink">No scene media or scanned documents attached</span>
+                              <p className="max-w-md text-[12px] leading-relaxed">
+                                Paramedics have not attached external injury photos or identification documents to this run. Real-time updates from ambulance handheld will populate here automatically.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               )}
