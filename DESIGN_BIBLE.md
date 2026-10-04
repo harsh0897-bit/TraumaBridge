@@ -23,22 +23,26 @@ All colors, depths, and surfaces are strictly locked. Component code must refere
 | `tile` | `#FFFFFF` | Primary module surface |
 | `border` | `#E3EAF2` | 1px subtle structural border |
 | `ink` | `#111827` | Primary text & high-contrast figures |
-| `ink-2` | `#64748B` | Secondary text, clinical labels, metadata |
+| `ink-2` | `#475569` | Secondary text, clinical labels, metadata (text-safe contrast on well/tile/soft) |
 
 ### Primary & Action
 | Token | Hex / Value | Purpose |
 | :--- | :--- | :--- |
-| `primary` | `#2878D7` | TraumaBridge interactive action & focus |
+| `primary` | `#1B5FB4` | TraumaBridge interactive action, focus & filled buttons (white text 6.28) |
+| `primary-ink` | `#1B5FB4` | Primary action text, text on primary-soft (5.73 on #EEF5FF) |
 | `primary-soft` | `#EEF5FF` | Active selection, tab indicator, soft highlight |
-| `primary-deep` | `#0F3F82` | Hero tile gradient start (used to `#1B5FB4`) |
+| `primary-deep` | `#0F3F82` | Hero tile gradient start |
 | `hero-to` | `#1B5FB4` | Hero tile gradient end |
 
 ### Semantic State System (State Only — Never Decorative)
-| State | Solid Ink | Soft Background | Semantic Meaning |
-| :--- | :--- | :--- | :--- |
-| **Success** | `#19A974` | `#ECF9F3` | Confirmed Ready / Normal / Complete |
-| **Warning** | `#D99000` | `#FFF6E4` | Urgent / In Progress / Attention Required |
-| **Critical** | `#D92D20` | `#FFF1EF` | P1 Critical Alert / Severe / Vital Collapse |
+Accent colors stay for dots, rings, strokes, fills, icons and numerals >= 24px bold. TEXT under 24px uses text-safe ink tokens.
+| State | Solid Accent | Soft Background | Safe Text Ink | Semantic Meaning |
+| :--- | :--- | :--- | :--- | :--- |
+| **Success** | `#19A974` | `#ECF9F3` | `#0B7A53` (`success-ink`) | Confirmed Ready / Normal / Complete |
+| **Warning** | `#D99000` | `#FFF6E4` | `#8A5A00` (`warning-ink`) | Urgent / In Progress / Attention Required |
+| **Critical** | `#D92D20` | `#FFF1EF` | `#B42318` (`critical-ink`) | P1 Critical Alert / Severe / Vital Collapse |
+
+*Clinical Note: Shock Index thresholds (<0.9 normal/success, 0.9 to 0.99 warning, >=1.0 critical) are demo thresholds pending clinician review. Do not change existing BP/HR/SpO2 threshold logic.*
 
 ---
 

@@ -11,20 +11,12 @@ import {
   SegmentedTabs,
   PillButton,
   Countdown,
-  AuditBadge,
 } from '@/components/shared'
-import { runClientAudit } from '@/lib/audit'
 import { Layers, RefreshCw, ExternalLink } from 'lucide-react'
 
 export default function HospitalDesignKitPage() {
   const [activeTab, setActiveTab] = useState('overview')
   const [demoCount, setDemoCount] = useState(118)
-
-  React.useEffect(() => {
-    if (typeof window !== 'undefined') {
-      ;(window as any).__runAudit = runClientAudit
-    }
-  }, [])
 
   const tabOptions = [
     { id: 'overview', label: 'Overview' },
@@ -311,9 +303,6 @@ export default function HospitalDesignKitPage() {
           </div>
         </Tile>
       </div>
-
-      {/* Real-time Quality Proof Engine Badge */}
-      <AuditBadge />
     </div>
   )
 }

@@ -2,6 +2,7 @@
  * TRAUMABRIDGE AI — Unified Case Urgency
  * Single source of truth for case urgency across the hospital console.
  * Used identically in the case rail, header, hero tile, and protocol labels.
+ * Label text is strictly identical everywhere: "Critical" / "Urgent".
  */
 
 import type { EmergencyRun } from '@/types/run'
@@ -10,7 +11,7 @@ export type CaseUrgencyLevel = 'critical' | 'urgent' | 'routine' | 'unsent'
 
 export interface CaseUrgency {
   level: CaseUrgencyLevel
-  label: string
+  label: 'Critical' | 'Urgent' | 'Awaiting handover'
   chipStatus: 'critical' | 'warning' | 'info' | 'neutral'
   badgeClass: string
   isCritical: boolean
@@ -26,7 +27,7 @@ export function getCaseUrgency(run?: EmergencyRun | null): CaseUrgency {
   if (!run) {
     return {
       level: 'unsent',
-      label: 'Standby',
+      label: 'Awaiting handover',
       chipStatus: 'neutral',
       badgeClass: 'bg-slate-100 text-slate-600 border-slate-200',
       isCritical: false,
@@ -39,7 +40,7 @@ export function getCaseUrgency(run?: EmergencyRun | null): CaseUrgency {
   if (run.alertStatus === 'not-sent') {
     return {
       level: 'unsent',
-      label: 'Awaiting Handover',
+      label: 'Awaiting handover',
       chipStatus: 'neutral',
       badgeClass: 'bg-slate-100 text-slate-700 border-slate-200',
       isCritical: false,
@@ -67,9 +68,9 @@ export function getCaseUrgency(run?: EmergencyRun | null): CaseUrgency {
   ) {
     return {
       level: 'critical',
-      label: 'Critical Alert (P1)',
+      label: 'Critical',
       chipStatus: 'critical',
-      badgeClass: 'bg-critical-soft text-critical border-critical/30',
+      badgeClass: 'bg-critical-soft text-critical-ink border-critical/30',
       isCritical: true,
       isUrgent: false,
       isUnsent: false,
@@ -79,9 +80,9 @@ export function getCaseUrgency(run?: EmergencyRun | null): CaseUrgency {
   // 3. Urgent Priority (P2)
   return {
     level: 'urgent',
-    label: 'Urgent Alert (P2)',
+    label: 'Urgent',
     chipStatus: 'warning',
-    badgeClass: 'bg-warning-soft text-warning border-warning/30',
+    badgeClass: 'bg-warning-soft text-warning-ink border-warning/30',
     isCritical: false,
     isUrgent: true,
     isUnsent: false,

@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import {
   Activity, Clock, Bell, Check, AlertTriangle, ChevronRight,
   Radio, Droplets, User, MapPin, Heart, RefreshCw, Search, X,
@@ -22,7 +23,6 @@ import {
   SegmentedTabs,
   PillButton,
   Countdown,
-  AuditBadge,
 } from '@/components/shared'
 import { InjuryMap } from '@/components/ambulance/InjuryMap'
 import { getCaseUrgency } from '@/lib/case-urgency'
@@ -46,21 +46,8 @@ import {
   press,
 } from '@/lib/motion'
 import { cn } from '@/lib/utils'
-
-import { runClientAudit, type AuditReport } from '@/lib/audit'
-
-// ─── Formatters ───────────────────────────────────────────────────────────────
-
-function formatRelativeMinutes(iso?: string) {
-  if (!iso) return '—'
-  try {
-    const diff = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000))
-    if (diff === 0) return 'Just now'
-    return `${diff}m ago`
-  } catch {
-    return iso
-  }
-}
+import { formatClock, formatAgo, formatDateTimeLong } from '@/lib/format-time'
+import { patientLabel } from '@/lib/patient-label'
 
 type HospitalTab = 'overview' | 'clinical' | 'preparation' | 'activity'
 
@@ -115,7 +102,7 @@ const DEMO_UNSENT_CASE: EmergencyRun = {
 
 // ─── MAIN HOSPITAL APPLICATION (SINGLE SCREEN VIEWPORT) ────────────────────────
 
-export default function HospitalPage() {
+function HospitalPageContent() {
   const {
     activeRun,
     loadDemoRun,
@@ -125,6 +112,8 @@ export default function HospitalPage() {
   } = useRunStore()
 
   const reducedMotion = useReducedMotion()
+  const searchParams = useSearchParams()
+  const isUnsentState = searchParams?.get('state') === 'unsent'
 
   // Cross-tab sync
   useEffect(() => {
@@ -138,8 +127,8 @@ export default function HospitalPage() {
     }
   }, [activeRun, loadDemoRun])
 
-  // Case Selection & Navigation State
-  const [selectedCaseId, setSelectedCaseId] = useState<'alpha-seeded' | 'bravo-3' | 'alpha-unsent'>('alpha-seeded')
+  // Case Selection & Navigation State (Only 2 real cases: Alpha 7 and Bravo 3)
+  const [selectedCaseId, setSelectedCaseId] = useState<'alpha-seeded' | 'bravo-3'>('alpha-seeded')
   const [activeTab, setActiveTab] = useState<HospitalTab>('overview')
   const [searchQuery, setSearchQuery] = useState('')
   const [mounted, setMounted] = useState(false)
@@ -151,9 +140,6 @@ export default function HospitalPage() {
   // Gate time-based values behind mounted flag so SSR and first client render match
   useEffect(() => {
     setMounted(true)
-    if (typeof window !== 'undefined') {
-      ;(window as any).__runAudit = runClientAudit
-    }
     const updateTime = () => {
       setNowString(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
     }
@@ -162,22 +148,22 @@ export default function HospitalPage() {
     return () => clearInterval(timer)
   }, [])
 
-  // Cases setup
+  // Cases setup: Unsent state of Alpha 7 is reachable ONLY via ?state=unsent
   const seededAlphaRun: EmergencyRun = activeRun && activeRun.alertStatus !== 'not-sent' ? activeRun : DEMO_RUN
   const bravoRun: EmergencyRun = DEMO_SECONDARY_CASE
   const unsentAlphaRun: EmergencyRun = activeRun && activeRun.alertStatus === 'not-sent' ? activeRun : DEMO_UNSENT_CASE
+
+  const alphaRun = isUnsentState ? unsentAlphaRun : seededAlphaRun
 
   const currentRun: EmergencyRun = useMemo(() => {
     switch (selectedCaseId) {
       case 'bravo-3':
         return bravoRun
-      case 'alpha-unsent':
-        return unsentAlphaRun
       case 'alpha-seeded':
       default:
-        return seededAlphaRun
+        return alphaRun
     }
-  }, [selectedCaseId, seededAlphaRun, bravoRun, unsentAlphaRun])
+  }, [selectedCaseId, alphaRun, bravoRun])
 
   // Ensure stable deadline for current run
   if (!deadlineCache.current[currentRun.id]) {
@@ -240,28 +226,23 @@ export default function HospitalPage() {
     updateHospitalPrep(id, nextStatus, 'ED Coordinator')
   }
 
-  // Case Rail definition
+  // Case Rail definition (Only real cases: exactly 2 cases)
   const allCases = [
     {
       id: 'alpha-seeded' as const,
-      case: seededAlphaRun,
-      title: 'Unknown Male (~38y)',
-      urgency: getCaseUrgency(seededAlphaRun),
-      bay: 'Bay 2',
+      case: alphaRun,
+      title: patientLabel(alphaRun).title,
+      sub: patientLabel(alphaRun).sub,
+      urgency: getCaseUrgency(alphaRun),
+      bay: isUnsentState ? 'Standby' : 'Bay 2',
     },
     {
       id: 'bravo-3' as const,
       case: bravoRun,
-      title: bravoRun.patient.name ?? 'Sarah Mitchell (52y)',
+      title: patientLabel(bravoRun).title,
+      sub: patientLabel(bravoRun).sub,
       urgency: getCaseUrgency(bravoRun),
       bay: 'Bay 3',
-    },
-    {
-      id: 'alpha-unsent' as const,
-      case: unsentAlphaRun,
-      title: 'Awaiting Handover (Alpha 7)',
-      urgency: getCaseUrgency(unsentAlphaRun),
-      bay: 'Standby',
     },
   ]
 
@@ -292,7 +273,7 @@ export default function HospitalPage() {
           <span>TRAUMABRIDGE CLINICAL SYSTEM · DEMO RUN SIMULATION · NON-CLINICAL USE ONLY</span>
         </div>
         <span className="text-ink-2 font-mono text-[12px]">
-          NHS TRUST GATEWAY ACTIVE
+          SIMULATED GATEWAY · DEMO ONLY
         </span>
       </div>
 
@@ -396,12 +377,15 @@ export default function HospitalPage() {
               const itemUrgency = item.urgency
               const itemHasBlood = !!item.case.bloodBankRequest
 
+              const pLab = patientLabel(item.case)
+
               return (
                 <div
                   key={item.id}
+                  data-rail-row="true"
                   onClick={() => setSelectedCaseId(item.id)}
                   className={cn(
-                    'p-3.5 transition-colors cursor-pointer text-left relative select-none group',
+                    'px-4 py-3.5 transition-colors cursor-pointer text-left relative select-none group',
                     isSelected ? 'bg-primary-soft' : 'bg-tile hover:bg-well'
                   )}
                 >
@@ -409,7 +393,7 @@ export default function HospitalPage() {
                   {isSelected && (
                     <motion.div
                       layoutId="rail-selected-accent"
-                      className="absolute left-0 top-0 bottom-0 w-1 bg-primary"
+                      className="absolute left-0 top-0 bottom-0 w-1 bg-primary z-10"
                       transition={spring}
                     />
                   )}
@@ -432,27 +416,28 @@ export default function HospitalPage() {
                         )}
                       />
                       <span
+                        data-urgency-rail="true"
                         className={cn(
                           'text-[12px] font-bold uppercase',
                           itemUrgency.chipStatus === 'critical'
-                            ? 'text-critical'
+                            ? 'text-critical-ink'
                             : itemUrgency.chipStatus === 'warning'
-                            ? 'text-warning'
+                            ? 'text-warning-ink'
                             : 'text-ink-2'
                         )}
                       >
-                        {itemUrgency.level === 'unsent' ? 'Standby' : itemUrgency.level}
+                        {itemUrgency.label}
                       </span>
                     </div>
 
-                    <span className="font-mono text-[12px] font-bold text-primary tabular-nums">
+                    <span className="font-mono text-[12px] font-bold text-primary-ink tabular-nums">
                       {item.case.alertStatus === 'not-sent' ? '—' : `ETA ${item.case.eta ?? 4}m`}
                     </span>
                   </div>
 
                   {/* Patient Line */}
                   <div className="font-semibold text-[13px] text-ink truncate">
-                    {item.title}
+                    {pLab.title} <span className="font-normal text-ink-2">({pLab.sub})</span>
                   </div>
 
                   {/* Mechanism */}
@@ -484,19 +469,21 @@ export default function HospitalPage() {
             <div className="flex flex-col gap-1 min-w-0">
               <div className="flex items-center gap-2.5 flex-wrap">
                 <h2 className="text-[28px] font-semibold text-ink leading-tight tracking-tight truncate">
-                  {currentRun.patient.name ?? 'Unidentified Patient'}
+                  {patientLabel(currentRun).title}
                 </h2>
+                <span data-urgency-header="true">
+                  <StatusChip
+                    status={urgency.chipStatus}
+                    label={urgency.label}
+                    size="sm"
+                  />
+                </span>
                 <StatusChip
-                  status={urgency.chipStatus}
-                  label={urgency.label}
-                  size="sm"
-                />
-                <StatusChip
-                  status={currentRun.patient.name ? 'success' : 'neutral'}
+                  status={!patientLabel(currentRun).isUnidentified ? 'success' : 'neutral'}
                   label={
-                    currentRun.patient.name
+                    !patientLabel(currentRun).isUnidentified
                       ? 'Identity Confirmed'
-                      : 'Unidentified · John Doe #402'
+                      : 'Unidentified'
                   }
                   size="sm"
                 />
@@ -504,9 +491,9 @@ export default function HospitalPage() {
 
               {/* Meta line: Age, sex, unit crew, red allergy chip, mono case ID */}
               <div className="flex items-center gap-2 text-[13px] text-ink-2 flex-wrap">
-                <span>Approx. {currentRun.patient.estimatedAge ?? 38} yrs</span>
+                <span>{patientLabel(currentRun).sub}</span>
                 <span>·</span>
-                <span className="capitalize">{currentRun.patient.sex ?? 'Male'}</span>
+                <span className="capitalize">{currentRun.patient.sex === 'female' ? 'Female' : 'Male'}</span>
                 <span>·</span>
                 <span>{currentRun.callsign} ({currentRun.crewLead})</span>
 
@@ -514,7 +501,7 @@ export default function HospitalPage() {
                   <>
                     <span>·</span>
                     <span className="px-2 py-0.5 rounded-pill bg-critical-soft text-critical-ink font-bold text-[12px] border border-critical/20">
-                      Allergies: {currentRun.patient.allergies.join(', ')}
+                      Allergy: {currentRun.patient.allergies.join(', ')}
                     </span>
                   </>
                 ) : (
@@ -525,8 +512,8 @@ export default function HospitalPage() {
                 )}
 
                 <span>·</span>
-                <span className="font-mono text-[12px] text-ink-2">
-                  #{currentRun.id}
+                <span className="font-mono text-[12px] px-1.5 py-0.5 rounded bg-well border border-border text-ink-2">
+                  {currentRun.patient.id || currentRun.id}
                 </span>
               </div>
             </div>
@@ -536,13 +523,13 @@ export default function HospitalPage() {
               {currentRun.alertStatus === 'not-sent' ? (
                 <StatusChip
                   status="neutral"
-                  label="Awaiting Pre-Alert"
+                  label="Awaiting handover"
                   size="md"
                 />
               ) : currentRun.alertStatus === 'acknowledged' ? (
                 <StatusChip
                   status="success"
-                  label="Pre-Alert Active"
+                  label="Pre-alert active"
                   size="md"
                 />
               ) : (
@@ -588,44 +575,42 @@ export default function HospitalPage() {
                     {/* TILE 1: Hero Tile */}
                     <Tile
                       tone="hero"
+                      title={
+                        <span className="text-[15px] font-semibold text-white tracking-tight">
+                          {currentRun.alertStatus === 'not-sent' ? 'Awaiting handover' : 'Arriving in'}
+                        </span>
+                      }
                       action={{
                         label: 'Open hospital preparation board',
                         onClick: () => setActiveTab('preparation'),
                       }}
-                      className="h-full flex flex-col justify-between p-4"
+                      className="h-full flex flex-col justify-between p-5"
                     >
-                      <div>
-                        <span className="text-[12px] font-semibold text-white/80 block uppercase tracking-wider">
-                          {currentRun.alertStatus === 'not-sent' ? 'Awaiting Handover' : 'Arriving in'}
-                        </span>
-                        <div className="mt-1">
-                          {currentRun.alertStatus === 'not-sent' ? (
-                            <div className="text-[64px] font-mono leading-none tracking-tight font-bold text-white tabular-nums">
-                              —:—
-                            </div>
-                          ) : (
-                            <Countdown
-                              deadlineIso={deadlineCache.current[currentRun.id]}
-                              size="hero"
-                              tone="dark"
-                              showIcon={false}
-                            />
-                          )}
-                        </div>
+                      <div className="mt-1">
+                        {currentRun.alertStatus === 'not-sent' ? (
+                          <div className="text-[64px] font-mono leading-none tracking-tight font-extrabold text-white tabular-nums">
+                            —:—
+                          </div>
+                        ) : (
+                          <Countdown
+                            deadlineIso={deadlineCache.current[currentRun.id]}
+                            size="hero"
+                            tone="dark"
+                            showIcon={false}
+                          />
+                        )}
                       </div>
 
-                      <div className="flex items-center justify-between pt-2 border-t border-white/15">
+                      <div className="flex items-center justify-between pt-2">
                         <span className="text-[14px] font-medium text-white/90">
                           {currentRun.alertStatus === 'not-sent'
                             ? `Standby · ${currentRun.callsign}`
                             : `Resus Bay 2 · ${currentRun.callsign}`}
                         </span>
-                        <span className="px-2.5 py-1 rounded-pill bg-white/15 text-white text-[12px] font-semibold border border-white/20">
+                        <span data-urgency-hero="true" className="px-2.5 py-1 rounded-pill bg-white/15 text-white text-[12px] font-semibold border border-white/20">
                           {currentRun.alertStatus === 'not-sent'
                             ? 'Awaiting handover'
-                            : currentRun.alertStatus === 'acknowledged'
-                            ? 'Pre-alert active'
-                            : 'Alert pending ACK'}
+                            : urgency.label}
                         </span>
                       </div>
                     </Tile>
@@ -663,7 +648,7 @@ export default function HospitalPage() {
                         <div className="flex flex-col items-end">
                           <Sparkline data={hrTrend} color="#2878D7" width={96} height={40} />
                           <span className="text-[12px] font-mono text-ink-2 mt-1">
-                            {latestVitals?.source ?? 'Sensor'} · {formatRelativeMinutes(latestVitals?.timestamp)}
+                            {latestVitals?.source ?? 'Sensor'} · {mounted ? formatAgo(latestVitals?.timestamp) : '—'}
                           </span>
                         </div>
                       </div>
@@ -713,7 +698,7 @@ export default function HospitalPage() {
                             height={40}
                           />
                           <span className="text-[12px] font-mono text-ink-2 mt-1">
-                            {latestVitals?.source ?? 'NIBP'} · {formatRelativeMinutes(latestVitals?.timestamp)}
+                            {latestVitals?.source ?? 'NIBP'} · {mounted ? formatAgo(latestVitals?.timestamp) : '—'}
                           </span>
                         </div>
                       </div>
@@ -752,7 +737,7 @@ export default function HospitalPage() {
                         <div className="flex flex-col items-end">
                           <Sparkline data={spo2Trend} color="#D99000" width={96} height={40} />
                           <span className="text-[12px] font-mono text-ink-2 mt-1">
-                            {latestVitals?.source ?? 'Sensor'} · {formatRelativeMinutes(latestVitals?.timestamp)}
+                            {latestVitals?.source ?? 'Sensor'} · {mounted ? formatAgo(latestVitals?.timestamp) : '—'}
                           </span>
                         </div>
                       </div>
@@ -901,7 +886,11 @@ export default function HospitalPage() {
                             <span
                               className={cn(
                                 'text-[20px] font-bold font-mono tabular-nums leading-none',
-                                shockIndex && shockIndex.value >= 1.0 ? 'text-critical' : 'text-ink'
+                                shockIndex?.tone === 'critical'
+                                  ? 'text-critical-ink'
+                                  : shockIndex?.tone === 'warning'
+                                  ? 'text-warning-ink'
+                                  : 'text-ink'
                               )}
                             >
                               {shockIndex?.formatted ?? '—'}
@@ -912,9 +901,7 @@ export default function HospitalPage() {
                             status={
                               currentRun.alertStatus === 'not-sent'
                                 ? 'neutral'
-                                : shockIndex && shockIndex.value >= 1.0
-                                ? 'warning'
-                                : 'success'
+                                : shockIndex?.tone ?? 'neutral'
                             }
                             label={
                               currentRun.alertStatus === 'not-sent'
@@ -936,11 +923,11 @@ export default function HospitalPage() {
                             <div className="space-y-1 my-0.5">
                               <div className="flex items-center justify-between text-[12px] font-mono">
                                 <span className="text-ink-2">HR:</span>
-                                <span className="font-semibold text-primary">{hrTrend[0]} → {hrTrend[hrTrend.length - 1]}</span>
+                                <span className="font-semibold text-primary-ink">{hrTrend[0]} → {hrTrend[hrTrend.length - 1]}</span>
                               </div>
                               <div className="flex items-center justify-between text-[12px] font-mono">
                                 <span className="text-ink-2">SBP:</span>
-                                <span className="font-semibold text-critical">{sbpTrend[0] ?? 90} → {sbpTrend[sbpTrend.length - 1] ?? 88}</span>
+                                <span className="font-semibold text-critical-ink">{sbpTrend[0] ?? 90} → {sbpTrend[sbpTrend.length - 1] ?? 88}</span>
                               </div>
                             </div>
                           ) : (
@@ -1037,8 +1024,8 @@ export default function HospitalPage() {
                             <span className="text-[12px] font-bold uppercase tracking-wider text-ink-2">
                               Reported Mechanism
                             </span>
-                            <span className="text-[12px] text-ink-2 font-mono">
-                              Time: {currentRun.incident.time ?? 'Scene'}
+                            <span className="text-[12px] text-ink-2 font-mono" title={formatDateTimeLong(currentRun.incident.time)}>
+                              Time: {formatClock(currentRun.incident.time)}
                             </span>
                           </div>
                           <h4 className="text-[14px] font-bold text-ink">
@@ -1274,7 +1261,7 @@ export default function HospitalPage() {
                           </div>
                           <div className="flex items-center gap-3 text-ink-2 font-mono flex-shrink-0 text-[12px]">
                             <span>{ev.operator ?? ev.source}</span>
-                            <span>{new Date(ev.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
+                            <span>{formatClock(ev.timestamp)}</span>
                           </div>
                         </div>
                       ))}
@@ -1286,9 +1273,14 @@ export default function HospitalPage() {
           </div>
         </main>
       </div>
-
-      {/* Real-time Quality Proof Engine Badge */}
-      <AuditBadge />
     </div>
+  )
+}
+
+export default function HospitalPage() {
+  return (
+    <Suspense fallback={<div className="h-screen w-screen bg-well flex items-center justify-center text-ink-2 font-medium">Loading hospital console...</div>}>
+      <HospitalPageContent />
+    </Suspense>
   )
 }
