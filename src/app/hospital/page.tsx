@@ -2001,7 +2001,7 @@ function HospitalPageContent() {
               )}
 
               {/* ───────────────────────────────────────────────────────────── */}
-              {/* TAB 3: PREPARATION (Mounted inside bounded space)              */}
+              {/* TAB 3: PREPARATION (Bounded single-screen workspace, zero outer scroll) */}
               {/* ───────────────────────────────────────────────────────────── */}
               {activeTab === 'preparation' && (
                 <motion.div
@@ -2010,100 +2010,252 @@ function HospitalPageContent() {
                   initial="hidden"
                   animate="visible"
                   exit="exit"
-                  className="h-full flex flex-col justify-between overflow-y-auto pr-1 gap-4"
+                  className="h-full flex flex-col justify-between gap-3 overflow-hidden"
                 >
-                  <Tile title="Hospital Readiness Board">
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between pb-3 border-b border-border">
-                        <div>
-                          <p className="text-[13px] text-ink-2">
-                            Interactive department status. Click any module to cycle (Pending → In Progress → Ready).
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-[14px] font-bold text-success">
-                            {prepReadyCount} / {prepTotalCount} CONFIRMED READY
+                  {/* Header Band (80px, ProgressRing 72px with striped pending segment + 3/6 ready + one-line summary) */}
+                  <div className="h-[80px] max-h-[799px]:h-[68px] bg-tile rounded-[20px] border border-border px-5 py-2.5 flex items-center justify-between shrink-0 shadow-xs">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className="density-tall-only shrink-0">
+                        <ProgressRing
+                          value={prepProgressVal}
+                          pendingValue={prepPendingVal}
+                          variant="striped"
+                          size={64}
+                          strokeWidth={7}
+                          strokeColor="#19A974"
+                          label={`${prepReadyCount}`}
+                          caption="Ready"
+                        />
+                      </div>
+                      <div className="density-compact-only shrink-0">
+                        <ProgressRing
+                          value={prepProgressVal}
+                          pendingValue={prepPendingVal}
+                          variant="striped"
+                          size={52}
+                          strokeWidth={6}
+                          strokeColor="#19A974"
+                          label={`${prepReadyCount}`}
+                          caption="Ready"
+                        />
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-[24px] max-h-[799px]:text-[20px] font-extrabold font-mono text-ink tracking-tight">
+                            {prepReadyCount} / {prepTotalCount}
                           </span>
+                          <span className="text-[13px] font-semibold text-success-ink">
+                            Departments Ready
+                          </span>
+                        </div>
+                        <p className="text-[12px] text-ink-2 truncate max-w-xl mt-0.5">
+                          {prepReadyCount === prepTotalCount
+                            ? 'All critical trauma services and resuscitation teams confirmed ready on standby.'
+                            : prepReadyCount === 0
+                            ? 'All departments on initial standby. Tap any department tile to cycle readiness state.'
+                            : `${prepReadyCount} confirmed ready · ${prepPendingCount} in progress · ${prepTotalCount - prepReadyCount - prepPendingCount} pending acknowledgment.`}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[12px] font-semibold px-2.5 py-1 rounded-pill bg-success-soft text-success-ink border border-success/30">
+                        {prepReadyCount} Confirmed
+                      </span>
+                      {prepPendingCount > 0 && (
+                        <span className="text-[12px] font-semibold px-2.5 py-1 rounded-pill bg-warning-soft text-warning-ink border border-warning/30">
+                          {prepPendingCount} In Progress
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 3x2 Bento of Department Tiles (104px tall, 84px compact) */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 flex-1 min-h-0">
+                    {prepItems.map((item) => {
+                      const isReady = item.status === 'ready'
+                      const isInProgress = item.status === 'in-progress'
+                      const Icon =
+                        item.id === 'prep-trauma-bay'
+                          ? Bed
+                          : item.id === 'prep-team'
+                          ? Stethoscope
+                          : item.id === 'prep-ct'
+                          ? Activity
+                          : item.id === 'prep-ortho'
+                          ? Shield
+                          : item.id === 'prep-blood'
+                          ? Droplets
+                          : Building2
+
+                      return (
+                        <motion.button
+                          key={item.id}
+                          type="button"
+                          whileTap={press}
+                          onClick={() => cyclePrepStatus(item.id, item.status)}
+                          className={cn(
+                            'h-[104px] max-h-[799px]:h-[84px] p-3.5 max-h-[799px]:p-2.5 rounded-[20px] border text-left transition-all cursor-pointer flex flex-col justify-between select-none shadow-xs relative overflow-hidden',
+                            isReady
+                              ? 'bg-success-soft/75 border-success/40 text-ink shadow-sm'
+                              : isInProgress
+                              ? 'bg-warning-soft/75 border-warning/40 text-ink shadow-sm'
+                              : 'bg-well/80 border-border text-ink hover:bg-tile pattern-stripes'
+                          )}
+                        >
+                          {/* Top Row: Department Name & Status Chip */}
+                          <div className="flex items-start justify-between gap-2 z-10 w-full">
+                            <div>
+                              <span className="font-bold text-[14px] max-h-[799px]:text-[13px] text-ink block leading-snug">
+                                {item.label}
+                              </span>
+                              <span className="text-[11px] text-ink-2 font-medium">
+                                Dept: {item.team}
+                              </span>
+                            </div>
+
+                            <StatusChip
+                              status={isReady ? 'success' : isInProgress ? 'warning' : 'neutral'}
+                              label={isReady ? 'Ready' : isInProgress ? 'In progress' : 'Pending'}
+                              size="sm"
+                            />
+                          </div>
+
+                          {/* Bottom Row: Helper & Animated Indicator / Icon */}
+                          <div className="flex items-center justify-between pt-1 border-t border-border/60 z-10 w-full">
+                            <span className="text-[11px] font-medium text-ink-2">
+                              Tap to cycle
+                            </span>
+
+                            <div className="flex items-center">
+                              {isReady ? (
+                                <div className="w-7 h-7 rounded-full bg-success text-white flex items-center justify-center shadow-xs">
+                                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                    <motion.path
+                                      d="M4 12l5 5L20 6"
+                                      initial={{ pathLength: 0 }}
+                                      animate={{ pathLength: 1 }}
+                                      transition={{ duration: 0.35, ease }}
+                                    />
+                                  </svg>
+                                </div>
+                              ) : isInProgress ? (
+                                <div className="w-7 h-7 rounded-full bg-warning text-white flex items-center justify-center shadow-xs">
+                                  <Clock className="w-4 h-4 animate-spin-slow" />
+                                </div>
+                              ) : (
+                                <div className="w-7 h-7 rounded-full bg-slate-200 text-ink-2 flex items-center justify-center">
+                                  <Icon className="w-3.5 h-3.5 text-ink-2" />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </motion.button>
+                      )
+                    })}
+                  </div>
+
+                  {/* Full-width Blood Requisition Tile (96-112px, compact 84px) */}
+                  {hasBlood ? (
+                    <div className="h-[104px] max-h-[799px]:h-[84px] bg-tile rounded-[20px] border border-border px-5 py-3 max-h-[799px]:py-2 flex items-center justify-between gap-6 shrink-0 shadow-xs">
+                      {/* Left: Info & Units */}
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <div className="w-10 h-10 max-h-[799px]:w-8 max-h-[799px]:h-8 rounded-full bg-critical text-white flex items-center justify-center shrink-0 shadow-xs">
+                          <Droplets className="w-5 h-5 max-h-[799px]:w-4 max-h-[799px]:h-4 fill-white" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-[14px] max-h-[799px]:text-[13px] text-critical">
+                              {bloodReq?.unitsRequested ?? 4} units O-negative PRBCs
+                            </span>
+                            <StatusChip status="critical" label="MTP Protocol" size="sm" />
+                          </div>
+                          <p className="text-[12px] text-ink-2 truncate max-w-md mt-0.5">
+                            Emergency MTP protocol activated for suspected internal haemorrhage & pelvic fracture.
+                          </p>
                         </div>
                       </div>
 
-                      {/* 6 Preparation Cards Grid */}
-                      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3.5">
-                        {prepItems.map((item) => {
-                          const isReady = item.status === 'ready'
-                          const isInProgress = item.status === 'in-progress'
+                      {/* Middle: 4-Step Stepper */}
+                      <div className="hidden lg:flex items-center gap-2 shrink-0">
+                        {['Requested', 'Acknowledged', 'Preparing', 'Ready'].map((stepName, sIdx) => {
+                          const statusOrder = ['requested', 'acknowledged', 'preparing', 'ready']
+                          const curIdx = statusOrder.indexOf(bloodReq?.status || 'preparing')
+                          const isDone = sIdx <= curIdx
+                          const isCurrent = sIdx === curIdx
+
                           return (
-                            <button
-                              key={item.id}
-                              type="button"
-                              onClick={() => cyclePrepStatus(item.id, item.status)}
-                              className={cn(
-                                'p-4 rounded-inner border text-left transition-all cursor-pointer flex items-center justify-between gap-3 select-none shadow-xs',
-                                isReady
-                                  ? 'bg-success-soft border-success/30 text-ink'
-                                  : isInProgress
-                                  ? 'bg-warning-soft border-warning/30 text-ink'
-                                  : 'bg-well border-border text-ink hover:bg-tile'
-                              )}
-                            >
-                              <div>
-                                <span className="font-bold text-[14px] block">{item.label}</span>
-                                <span className="text-[12px] text-ink-2 block mt-0.5">
-                                  Dept: {item.team} · <span className="capitalize font-semibold">{item.status.replace('-', ' ')}</span>
+                            <React.Fragment key={stepName}>
+                              <div className="flex items-center gap-1.5">
+                                <span
+                                  className={cn(
+                                    'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold',
+                                    isDone
+                                      ? 'bg-critical text-white'
+                                      : 'bg-slate-200 text-ink-2'
+                                  )}
+                                >
+                                  {isDone ? '✓' : sIdx + 1}
+                                </span>
+                                <span
+                                  className={cn(
+                                    'text-[11px] font-medium',
+                                    isCurrent ? 'font-bold text-critical' : isDone ? 'text-ink' : 'text-ink-2'
+                                  )}
+                                >
+                                  {stepName}
                                 </span>
                               </div>
-
-                              <div className="flex-shrink-0">
-                                {isReady ? (
-                                  <span className="w-7 h-7 rounded-full bg-success text-white flex items-center justify-center text-[12px] font-bold">
-                                    ✓
-                                  </span>
-                                ) : isInProgress ? (
-                                  <span className="w-7 h-7 rounded-full bg-warning text-white flex items-center justify-center text-[12px] font-bold">
-                                    ◐
-                                  </span>
-                                ) : (
-                                  <span className="w-7 h-7 rounded-full bg-slate-200 text-ink-2 flex items-center justify-center text-[12px] font-bold">
-                                    ○
-                                  </span>
-                                )}
-                              </div>
-                            </button>
+                              {sIdx < 3 && (
+                                <div
+                                  className={cn(
+                                    'w-6 h-0.5',
+                                    sIdx < curIdx ? 'bg-critical' : 'bg-slate-200'
+                                  )}
+                                />
+                              )}
+                            </React.Fragment>
                           )
                         })}
                       </div>
-                    </div>
-                  </Tile>
 
-                  {/* Blood Bank Action Card */}
-                  {hasBlood && (
-                    <Tile title="Emergency Blood Requisition">
-                      <div className="flex items-center justify-between gap-4 flex-wrap">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-critical text-white flex items-center justify-center flex-shrink-0">
-                            <Droplets className="w-5 h-5 fill-white" />
-                          </div>
-                          <div>
-                            <span className="font-bold text-[14px] text-critical block">
-                              MTP Requisition: {bloodReq?.unitsRequested ?? 4} Units O-Negative PRBCs
-                            </span>
-                            <span className="text-ink-2 text-[12px]">
-                              Status: <strong className="uppercase font-mono">{bloodReq?.status}</strong> · Standby: Resus Bay 2
-                            </span>
-                          </div>
-                        </div>
-
-                        {bloodReq?.status === 'preparing' && (
+                      {/* Right: Confirmation Pill Button */}
+                      <div className="shrink-0">
+                        {bloodReq?.status === 'ready' ? (
+                          <span className="px-3 py-1.5 rounded-pill bg-success-soft text-success-ink font-bold text-[12px] border border-success/30 flex items-center gap-1.5">
+                            <Check className="w-4 h-4 text-success" />
+                            Confirmed at Bay 2
+                          </span>
+                        ) : (
                           <PillButton
                             variant="critical"
-                            size="md"
+                            size="sm"
                             onClick={() => updateBloodStatus('ready', { recipient: 'Resus Bay 2' })}
                           >
-                            Confirm Blood Delivery at Bay 2
+                            Confirm blood arrived at Bay 2
                           </PillButton>
                         )}
                       </div>
-                    </Tile>
+                    </div>
+                  ) : (
+                    // Bravo 3 designed state: 0/6 with no blood requisition
+                    <div className="h-[84px] max-h-[799px]:h-[72px] bg-tile rounded-[20px] border border-border px-5 py-2.5 flex items-center justify-between shrink-0 shadow-xs">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-well text-ink-2 flex items-center justify-center shrink-0 border border-border">
+                          <Droplets className="w-4 h-4 text-slate-400" />
+                        </div>
+                        <div>
+                          <span className="font-bold text-[13px] text-ink block">
+                            No Emergency Blood Requisition Required
+                          </span>
+                          <span className="text-[12px] text-ink-2">
+                            Patient stable en route (GCS 15, SBP 122). Standard blood group and save on hospital arrival.
+                          </span>
+                        </div>
+                      </div>
+                      <StatusChip status="neutral" label="Standard Protocol" size="sm" />
+                    </div>
                   )}
                 </motion.div>
               )}
