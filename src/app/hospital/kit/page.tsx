@@ -79,27 +79,23 @@ export default function HospitalDesignKitPage() {
         {/* TILE 1: Hero Tile */}
         <Tile
           tone="hero"
+          title="Arriving in"
           action={{
             label: 'Open resus preparation',
             onClick: () => {},
           }}
-          className="h-full flex flex-col justify-between p-4"
+          className="h-full flex flex-col justify-between p-4 max-h-[799px]:p-3"
         >
-          <div>
-            <span className="text-[12px] font-semibold text-white/80 block uppercase tracking-wider">
-              Arriving in
-            </span>
-            <div className="mt-1">
-              <Countdown
-                initialSeconds={240}
-                size="hero"
-                tone="dark"
-                showIcon={false}
-              />
-            </div>
+          <div className="mt-1">
+            <Countdown
+              initialSeconds={240}
+              size="hero"
+              tone="dark"
+              showIcon={false}
+            />
           </div>
 
-          <div className="flex items-center justify-between pt-2 border-t border-white/15">
+          <div className="flex items-center justify-between pt-2">
             <span className="text-[14px] font-medium text-white/90">
               Resus Bay 2 · Alpha 7
             </span>
@@ -199,29 +195,29 @@ export default function HospitalDesignKitPage() {
       </div>
 
       {/* ── ROW 2: Readiness Tile & Primitives Matrix (Hard size, no empty void) ─ */}
-      <div className="grid grid-cols-[1.1fr_2fr] gap-4 h-[clamp(240px,34vh,300px)] flex-shrink-0">
-        {/* Readiness Tile with 112px ProgressRing & Striped Pending Segment */}
+      <div className="grid grid-cols-[1.1fr_2fr] gap-4 h-[clamp(250px,36vh,320px)] flex-shrink-0">
+        {/* Readiness Tile with 104px ProgressRing & Striped Pending Segment */}
         <Tile
           title="Hospital Readiness"
           action={{
             label: 'Open readiness board',
             onClick: () => {},
           }}
-          className="h-full flex flex-col justify-between p-5"
+          className="h-full flex flex-col justify-between p-4 max-h-[799px]:p-3"
         >
           <div className="flex items-center justify-around flex-1 py-1">
             <ProgressRing
               value={50}
               pendingValue={33}
               variant="striped"
-              size={112}
-              strokeWidth={12}
+              size={96}
+              strokeWidth={10}
               strokeColor="#19A974"
               label="3 / 6"
               caption="Confirmed"
             />
 
-            <div className="flex flex-col gap-2.5">
+            <div className="flex flex-col gap-2 max-h-[799px]:gap-1">
               <div className="flex items-center gap-2 text-[12px] font-medium text-ink">
                 <span className="w-2.5 h-2.5 rounded-full bg-success flex-shrink-0" />
                 <span>3 Ready (Bay 2, Team, CT)</span>
@@ -240,7 +236,7 @@ export default function HospitalDesignKitPage() {
             </div>
           </div>
 
-          <div className="pt-3 border-t border-border flex items-center justify-between text-[12px] text-ink-2">
+          <div className="pt-2 border-t border-border flex items-center justify-between text-[12px] text-ink-2">
             <span>Assigned Bay: <strong className="text-ink font-semibold">Resus 2</strong></span>
             <span>Trauma Lead: <strong className="text-ink font-semibold">Dr. A. Vance</strong></span>
           </div>
@@ -249,12 +245,12 @@ export default function HospitalDesignKitPage() {
         {/* Matrix Tile: SegmentedTabs, StatusChip states, and PillButton variants */}
         <Tile
           title="Component Matrix & Interactive States"
-          className="h-full flex flex-col justify-between p-5"
+          className="h-full flex flex-col justify-between p-4 max-h-[799px]:p-3"
         >
-          <div className="flex flex-col justify-between flex-1 gap-4">
+          <div className="flex flex-col justify-between flex-1 gap-2.5 max-h-[799px]:gap-1.5">
             {/* SegmentedTabs */}
             <div>
-              <span className="text-[12px] font-semibold text-ink-2 block mb-1.5 uppercase tracking-wider">
+              <span className="text-[12px] font-semibold text-ink-2 block mb-1 uppercase tracking-wider">
                 SegmentedTabs (Sliding Indicator · Keyboard Arrow Nav · Badges)
               </span>
               <SegmentedTabs

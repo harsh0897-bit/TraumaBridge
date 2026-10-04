@@ -189,7 +189,7 @@ async function auditCurrentView(page) {
       }
 
       // (j) Rail row padding check
-      if (el.getAttribute('data-rail-row') === 'true' || (el.parentElement?.classList?.contains('divide-y') && el.classList.contains('cursor-pointer'))) {
+      if (el.getAttribute('data-rail-row') === 'true' || (el.closest('aside') && el.classList.contains('cursor-pointer'))) {
         const pl = parseFloat(style.paddingLeft)
         if (pl < 15.5) {
           issues.push({ code: 'j', message: `Rail row left padding < 16px (${pl}px)` })

@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-10-04T09:00:46.561Z",
-  "totalIssues": 19,
+  "timestamp": "2026-10-04T09:16:01.312Z",
+  "totalIssues": 0,
   "globalWorstContrast": 4.831413489227404,
   "reports": [
     {
@@ -21,132 +21,49 @@
       "route": "Design Kit",
       "viewport": "1440x900",
       "worstContrast": 4.831413489227404,
-      "issues": [
-        {
-          "code": "e",
-          "message": "Tile vertical overflow: scrollHeight (301) > clientHeight (298)"
-        }
-      ],
+      "issues": [],
       "consoleErrors": []
     },
     {
       "route": "Hospital",
       "viewport": "1280x720",
       "worstContrast": 4.948077621329407,
-      "issues": [
-        {
-          "code": "e",
-          "message": "Tile vertical overflow: scrollHeight (177) > clientHeight (166)"
-        },
-        {
-          "code": "e",
-          "message": "Tile vertical overflow: scrollHeight (170) > clientHeight (166)"
-        },
-        {
-          "code": "e",
-          "message": "Tile vertical overflow: scrollHeight (280) > clientHeight (236)"
-        },
-        {
-          "code": "e",
-          "message": "Tile vertical overflow: scrollHeight (252) > clientHeight (236)"
-        }
-      ],
+      "issues": [],
       "consoleErrors": []
     },
     {
       "route": "Hospital (Unsent)",
       "viewport": "1280x720",
       "worstContrast": 5.282361958913319,
-      "issues": [
-        {
-          "code": "e",
-          "message": "Tile vertical overflow: scrollHeight (196) > clientHeight (166)"
-        },
-        {
-          "code": "e",
-          "message": "Tile vertical overflow: scrollHeight (257) > clientHeight (236)"
-        },
-        {
-          "code": "e",
-          "message": "Tile vertical overflow: scrollHeight (252) > clientHeight (236)"
-        }
-      ],
+      "issues": [],
       "consoleErrors": []
     },
     {
       "route": "Design Kit",
       "viewport": "1280x720",
       "worstContrast": 4.831413489227404,
-      "issues": [
-        {
-          "code": "e",
-          "message": "Tile vertical overflow: scrollHeight (193) > clientHeight (166)"
-        },
-        {
-          "code": "e",
-          "message": "Tile vertical overflow: scrollHeight (170) > clientHeight (166)"
-        },
-        {
-          "code": "e",
-          "message": "Tile vertical overflow: scrollHeight (301) > clientHeight (243)"
-        }
-      ],
+      "issues": [],
       "consoleErrors": []
     },
     {
       "route": "Hospital",
       "viewport": "1024x768",
       "worstContrast": 4.948077621329407,
-      "issues": [
-        {
-          "code": "e",
-          "message": "Tile vertical overflow: scrollHeight (193) > clientHeight (175)"
-        },
-        {
-          "code": "e",
-          "message": "Tile vertical overflow: scrollHeight (371) > clientHeight (275)"
-        },
-        {
-          "code": "e",
-          "message": "Tile vertical overflow: scrollHeight (280) > clientHeight (275)"
-        }
-      ],
+      "issues": [],
       "consoleErrors": []
     },
     {
       "route": "Hospital (Unsent)",
       "viewport": "1024x768",
       "worstContrast": 5.282361958913319,
-      "issues": [
-        {
-          "code": "e",
-          "message": "Tile vertical overflow: scrollHeight (208) > clientHeight (175)"
-        },
-        {
-          "code": "e",
-          "message": "Tile vertical overflow: scrollHeight (309) > clientHeight (243)"
-        },
-        {
-          "code": "e",
-          "message": "Tile vertical overflow: scrollHeight (273) > clientHeight (243)"
-        }
-      ],
+      "issues": [],
       "consoleErrors": []
     },
     {
       "route": "Design Kit",
       "viewport": "1024x768",
       "worstContrast": 4.831413489227404,
-      "issues": [
-        {
-          "code": "e",
-          "message": "Tile vertical overflow: scrollHeight (193) > clientHeight (175)"
-        },
-        {
-          "code": "e",
-          "message": "Tile vertical overflow: scrollHeight (331) > clientHeight (259)"
-        }
-      ],
+      "issues": [],
       "consoleErrors": []
     }
   ]

@@ -33,6 +33,7 @@ import {
   getSpO2Status,
   getRespRateStatus,
   getGcsStatus,
+  calculateRTS,
 } from '@/lib/trauma-scores'
 import {
   ease,
@@ -100,6 +101,76 @@ const DEMO_UNSENT_CASE: EmergencyRun = {
   pendingSync: false,
 }
 
+// ─── TALL DENSITY VITALS TREND CHART ──────────────────────────────────────────
+function VitalsTrendChart({
+  hrTrend,
+  sbpTrend,
+}: {
+  hrTrend: number[]
+  sbpTrend: number[]
+}) {
+  const hrPoints = hrTrend.length > 0 ? hrTrend : [118, 118]
+  const sbpPoints = sbpTrend.length > 0 ? sbpTrend : [98, 98]
+
+  const minVal = 60
+  const maxVal = 140
+  const width = 320
+  const height = 50
+
+  const getY = (val: number) => {
+    const clamped = Math.max(minVal, Math.min(maxVal, val))
+    return height - ((clamped - minVal) / (maxVal - minVal)) * (height - 8) - 4
+  }
+
+  const getPointsPath = (data: number[]) => {
+    return data
+      .map((val, idx) => {
+        const x = data.length > 1 ? (idx / (data.length - 1)) * (width - 24) + 12 : width / 2
+        const y = getY(val)
+        return `${x.toFixed(1)},${y.toFixed(1)}`
+      })
+      .join(' L ')
+  }
+
+  const hrPath = `M ${getPointsPath(hrPoints)}`
+  const sbpPath = `M ${getPointsPath(sbpPoints)}`
+
+  return (
+    <div className="w-full flex flex-col justify-between h-[105px] pt-1">
+      <div className="flex items-center justify-between text-[12px] text-ink-2 mb-1">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 font-medium">
+            <span className="w-2 h-2 rounded-full bg-primary" />
+            <span className="text-ink">HR ({hrPoints[hrPoints.length - 1]} bpm)</span>
+          </div>
+          <div className="flex items-center gap-1.5 font-medium">
+            <span className="w-2 h-2 rounded-full bg-critical" />
+            <span className="text-ink">SBP ({sbpPoints[sbpPoints.length - 1]} mmHg)</span>
+          </div>
+        </div>
+        <span className="font-mono text-[12px]">Last 15m</span>
+      </div>
+
+      <div className="flex-1 w-full relative">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          className="w-full h-full overflow-visible"
+          preserveAspectRatio="none"
+        >
+          <line x1="0" y1={getY(100)} x2={width} y2={getY(100)} stroke="#E3EAF2" strokeDasharray="3 3" strokeWidth="1" />
+          <path d={hrPath} fill="none" stroke="#1B5FB4" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d={sbpPath} fill="none" stroke="#D92D20" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
+
+      <div className="flex items-center justify-between text-[12px] font-mono text-ink-2 mt-1">
+        <span>-15 min</span>
+        <span>Now</span>
+      </div>
+    </div>
+  )
+}
+
 // ─── MAIN HOSPITAL APPLICATION (SINGLE SCREEN VIEWPORT) ────────────────────────
 
 function HospitalPageContent() {
@@ -130,6 +201,8 @@ function HospitalPageContent() {
   // Case Selection & Navigation State (Only 2 real cases: Alpha 7 and Bravo 3)
   const [selectedCaseId, setSelectedCaseId] = useState<'alpha-seeded' | 'bravo-3'>('alpha-seeded')
   const [activeTab, setActiveTab] = useState<HospitalTab>('overview')
+  const [clinicalSubTab, setClinicalSubTab] = useState<'injuries' | 'vitals' | 'treatment' | 'mist' | 'evidence'>('injuries')
+  const [selectedInjuryId, setSelectedInjuryId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [mounted, setMounted] = useState(false)
   const [nowString, setNowString] = useState('23:40:00')
@@ -192,6 +265,9 @@ function HospitalPageContent() {
 
   // Shock Index
   const shockIndex = calculateShockIndex(hrValue, sbpValue)
+
+  // Revised Trauma Score (RTS)
+  const rtsResult = calculateRTS(gcsValue ?? 14, sbpValue ?? 98, rrValue ?? 20)
 
   // Threshold statuses
   const hrStatus = getHeartRateStatus(hrValue)
@@ -463,10 +539,10 @@ function HospitalPageContent() {
         </aside>
 
         {/* ── RIGHT WORKSPACE: #F8FBFF Well ─────────────────────────────────── */}
-        <main className="flex-1 flex flex-col min-h-0 bg-well p-6 max-h-[800px]:p-5 gap-3.5 overflow-hidden">
-          {/* ── CASE HEADER (Stays mounted; values tween) ───────────────────── */}
-          <div className="flex-shrink-0 bg-tile rounded-tile border border-border px-5 py-3.5 shadow-tile flex items-center justify-between gap-4">
-            <div className="flex flex-col gap-1 min-w-0">
+        <main className="flex-1 flex flex-col min-h-0 bg-well px-6 py-6 max-h-[799px]:px-5 max-h-[799px]:py-5 overflow-hidden">
+          {/* ── CASE BAND (D5: no card, no border; sits directly on #F8FBFF well, height 72px) ── */}
+          <div className="h-[72px] flex items-center justify-between gap-4 flex-shrink-0">
+            <div className="flex flex-col justify-center gap-1 min-w-0">
               <div className="flex items-center gap-2.5 flex-wrap">
                 <h2 className="text-[28px] font-semibold text-ink leading-tight tracking-tight truncate">
                   {patientLabel(currentRun).title}
@@ -489,7 +565,7 @@ function HospitalPageContent() {
                 />
               </div>
 
-              {/* Meta line: Age, sex, unit crew, red allergy chip, mono case ID */}
+              {/* Line 2 (13px, ink-2): "~38 y · Male · Alpha 7 (Para. J. Chen) · [Allergy: Penicillin red chip] · temp ID (mono)" */}
               <div className="flex items-center gap-2 text-[13px] text-ink-2 flex-wrap">
                 <span>{patientLabel(currentRun).sub}</span>
                 <span>·</span>
@@ -512,13 +588,13 @@ function HospitalPageContent() {
                 )}
 
                 <span>·</span>
-                <span className="font-mono text-[12px] px-1.5 py-0.5 rounded bg-well border border-border text-ink-2">
+                <span className="font-mono text-[12px] px-1.5 py-0.5 rounded bg-tile border border-border text-ink-2">
                   {currentRun.patient.id || currentRun.id}
                 </span>
               </div>
             </div>
 
-            {/* Header Right Action (ACK pill or Pre-alert active chip; NO repeated ETA/destination) */}
+            {/* Right side: "Pre-alert active" success chip or the ACK pill */}
             <div className="flex items-center gap-2.5 flex-shrink-0">
               {currentRun.alertStatus === 'not-sent' ? (
                 <StatusChip
@@ -544,8 +620,8 @@ function HospitalPageContent() {
             </div>
           </div>
 
-          {/* ── CASE NAVIGATION TABS (SegmentedTabs 44px) ──────────────────── */}
-          <div className="flex-shrink-0">
+          {/* ── TABS directly below, 12px gap, height 44px ────────────────── */}
+          <div className="mt-3 mb-4 flex-shrink-0">
             <SegmentedTabs
               tabs={tabs}
               activeId={activeTab}
@@ -570,48 +646,49 @@ function HospitalPageContent() {
                   exit="exit"
                   className="h-full flex flex-col gap-4 overflow-hidden"
                 >
-                  {/* ROW 1: Height clamp(168px, 23vh, 208px), columns 1.35fr 1fr 1fr 1fr */}
+                  {/* ROW 1 (D6): Height clamp(168px, 23vh, 208px), columns 1.35fr 1fr 1fr 1fr */}
                   <div className="grid grid-cols-[1.35fr_1fr_1fr_1fr] gap-4 h-[clamp(168px,23vh,208px)] flex-shrink-0">
                     {/* TILE 1: Hero Tile */}
                     <Tile
                       tone="hero"
-                      title={
-                        <span className="text-[15px] font-semibold text-white tracking-tight">
-                          {currentRun.alertStatus === 'not-sent' ? 'Awaiting handover' : 'Arriving in'}
-                        </span>
-                      }
+                      title={currentRun.alertStatus === 'not-sent' ? 'Awaiting handover' : 'Arriving in'}
                       action={{
                         label: 'Open hospital preparation board',
                         onClick: () => setActiveTab('preparation'),
                       }}
-                      className="h-full flex flex-col justify-between p-5"
+                      className="h-full flex flex-col"
                     >
-                      <div className="mt-1">
-                        {currentRun.alertStatus === 'not-sent' ? (
-                          <div className="text-[64px] font-mono leading-none tracking-tight font-extrabold text-white tabular-nums">
-                            —:—
-                          </div>
-                        ) : (
-                          <Countdown
-                            deadlineIso={deadlineCache.current[currentRun.id]}
-                            size="hero"
-                            tone="dark"
-                            showIcon={false}
-                          />
-                        )}
-                      </div>
+                      <div className="flex-1 flex flex-col justify-between min-h-0">
+                        <div className="mt-0.5">
+                          {currentRun.alertStatus === 'not-sent' ? (
+                            <div className="text-[64px] max-h-[799px]:text-[48px] font-mono leading-none tracking-tight font-extrabold text-white tabular-nums">
+                              —:—
+                            </div>
+                          ) : (
+                            <Countdown
+                              deadlineIso={deadlineCache.current[currentRun.id]}
+                              size="hero"
+                              tone="dark"
+                              showIcon={false}
+                            />
+                          )}
+                        </div>
 
-                      <div className="flex items-center justify-between pt-2">
-                        <span className="text-[14px] font-medium text-white/90">
-                          {currentRun.alertStatus === 'not-sent'
-                            ? `Standby · ${currentRun.callsign}`
-                            : `Resus Bay 2 · ${currentRun.callsign}`}
-                        </span>
-                        <span data-urgency-hero="true" className="px-2.5 py-1 rounded-pill bg-white/15 text-white text-[12px] font-semibold border border-white/20">
-                          {currentRun.alertStatus === 'not-sent'
-                            ? 'Awaiting handover'
-                            : urgency.label}
-                        </span>
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="text-[14px] max-h-[799px]:text-[13px] font-medium text-white/90 truncate">
+                            {currentRun.alertStatus === 'not-sent'
+                              ? `Standby · ${currentRun.callsign}`
+                              : `Resus Bay 2 · ${currentRun.callsign}`}
+                          </span>
+                          <span
+                            data-urgency-hero="true"
+                            className="px-2.5 py-0.5 rounded-pill bg-white/15 text-white text-[12px] font-semibold border border-white/20 flex-shrink-0"
+                          >
+                            {currentRun.alertStatus === 'not-sent'
+                              ? 'Awaiting handover'
+                              : urgency.label}
+                          </span>
+                        </div>
                       </div>
                     </Tile>
 
@@ -620,11 +697,14 @@ function HospitalPageContent() {
                       title="Heart rate"
                       action={{
                         label: 'Open clinical telemetry',
-                        onClick: () => setActiveTab('clinical'),
+                        onClick: () => {
+                          setClinicalSubTab('vitals')
+                          setActiveTab('clinical')
+                        },
                       }}
-                      className="h-full flex flex-col justify-between p-4"
+                      className="h-full flex flex-col"
                     >
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex-1 flex items-center justify-between gap-2 min-h-0">
                         <div>
                           {hrValue !== undefined ? (
                             <StatNumber
@@ -633,7 +713,7 @@ function HospitalPageContent() {
                               size="stat"
                             />
                           ) : (
-                            <span className="text-[44px] font-extrabold text-ink font-mono tabular-nums leading-none">
+                            <span className="text-[44px] max-h-[799px]:text-[32px] font-extrabold text-ink font-mono tabular-nums leading-none">
                               —
                             </span>
                           )}
@@ -646,7 +726,7 @@ function HospitalPageContent() {
                           </div>
                         </div>
                         <div className="flex flex-col items-end">
-                          <Sparkline data={hrTrend} color="#2878D7" width={96} height={40} />
+                          <Sparkline data={hrTrend} color="#1B5FB4" width={88} height={36} />
                           <span className="text-[12px] font-mono text-ink-2 mt-1">
                             {latestVitals?.source ?? 'Sensor'} · {mounted ? formatAgo(latestVitals?.timestamp) : '—'}
                           </span>
@@ -659,18 +739,21 @@ function HospitalPageContent() {
                       title="Blood pressure"
                       action={{
                         label: 'Open clinical telemetry',
-                        onClick: () => setActiveTab('clinical'),
+                        onClick: () => {
+                          setClinicalSubTab('vitals')
+                          setActiveTab('clinical')
+                        },
                       }}
-                      className="h-full flex flex-col justify-between p-4"
+                      className="h-full flex flex-col"
                     >
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex-1 flex items-center justify-between gap-2 min-h-0">
                         <div>
                           {sbpValue !== undefined ? (
                             <div className="flex items-baseline gap-1">
                               <span
                                 className={cn(
-                                  'text-[44px] font-extrabold font-mono tabular-nums leading-none tracking-tight',
-                                  bpStatus.status === 'critical' ? 'text-critical' : 'text-ink'
+                                  'text-[44px] max-h-[799px]:text-[32px] font-extrabold font-mono tabular-nums leading-none tracking-tight',
+                                  bpStatus.status === 'critical' ? 'text-critical-ink' : 'text-ink'
                                 )}
                               >
                                 {sbpValue}/{dbpValue ?? 60}
@@ -678,7 +761,7 @@ function HospitalPageContent() {
                               <span className="text-sm font-semibold text-ink-2">mmHg</span>
                             </div>
                           ) : (
-                            <span className="text-[44px] font-extrabold text-ink font-mono tabular-nums leading-none">
+                            <span className="text-[44px] max-h-[799px]:text-[32px] font-extrabold text-ink font-mono tabular-nums leading-none">
                               —/—
                             </span>
                           )}
@@ -693,9 +776,9 @@ function HospitalPageContent() {
                         <div className="flex flex-col items-end">
                           <Sparkline
                             data={sbpTrend}
-                            color={bpStatus.status === 'critical' ? '#D92D20' : '#2878D7'}
-                            width={96}
-                            height={40}
+                            color={bpStatus.status === 'critical' ? '#D92D20' : '#1B5FB4'}
+                            width={88}
+                            height={36}
                           />
                           <span className="text-[12px] font-mono text-ink-2 mt-1">
                             {latestVitals?.source ?? 'NIBP'} · {mounted ? formatAgo(latestVitals?.timestamp) : '—'}
@@ -709,11 +792,14 @@ function HospitalPageContent() {
                       title="Oxygen saturation"
                       action={{
                         label: 'Open clinical telemetry',
-                        onClick: () => setActiveTab('clinical'),
+                        onClick: () => {
+                          setClinicalSubTab('vitals')
+                          setActiveTab('clinical')
+                        },
                       }}
-                      className="h-full flex flex-col justify-between p-4"
+                      className="h-full flex flex-col"
                     >
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex-1 flex items-center justify-between gap-2 min-h-0">
                         <div>
                           {spo2Value !== undefined ? (
                             <StatNumber
@@ -722,7 +808,7 @@ function HospitalPageContent() {
                               size="stat"
                             />
                           ) : (
-                            <span className="text-[44px] font-extrabold text-ink font-mono tabular-nums leading-none">
+                            <span className="text-[44px] max-h-[799px]:text-[32px] font-extrabold text-ink font-mono tabular-nums leading-none">
                               —
                             </span>
                           )}
@@ -735,7 +821,7 @@ function HospitalPageContent() {
                           </div>
                         </div>
                         <div className="flex flex-col items-end">
-                          <Sparkline data={spo2Trend} color="#D99000" width={96} height={40} />
+                          <Sparkline data={spo2Trend} color="#8A5A00" width={88} height={36} />
                           <span className="text-[12px] font-mono text-ink-2 mt-1">
                             {latestVitals?.source ?? 'Sensor'} · {mounted ? formatAgo(latestVitals?.timestamp) : '—'}
                           </span>
@@ -744,70 +830,111 @@ function HospitalPageContent() {
                     </Tile>
                   </div>
 
-                  {/* ROW 2: Fills remaining height, columns 5fr 4fr 3fr, gap 16 */}
+                  {/* ROW 2 (D7): Fills remaining height, columns 5fr 4fr 3fr, gap 16 */}
                   <div className="grid grid-cols-[5fr_4fr_3fr] gap-4 flex-1 min-h-0">
                     {/* COL 1 (5fr): Key Findings */}
                     <Tile
-                      title="Key Clinical Findings"
+                      title="Key findings"
                       action={{
-                        label: 'View all injuries',
-                        onClick: () => setActiveTab('clinical'),
+                        label: 'All clinical details',
+                        onClick: () => {
+                          setClinicalSubTab('injuries')
+                          setActiveTab('clinical')
+                        },
                       }}
-                      className="h-full flex flex-col justify-between p-4"
+                      className="h-full flex flex-col"
                     >
-                      <div className="flex flex-col flex-1 min-h-0 justify-between gap-2">
-                        {/* One-line mechanism header (truncated with title attr) */}
-                        <div
-                          title={`${currentRun.incident.mechanism ?? 'Mechanism unknown'}: ${currentRun.incident.detail ?? 'No details'}`}
-                          className="px-3 py-1.5 rounded-lg bg-well border border-border text-[12px] text-ink truncate font-medium flex-shrink-0"
-                        >
-                          <strong className="text-ink font-bold">Mechanism:</strong>{' '}
-                          {currentRun.incident.mechanism} — {currentRun.incident.detail || 'High impact trauma.'}
-                        </div>
+                      <div className="flex flex-col flex-1 min-h-0">
+                        {/* Top content area with fixed gaps */}
+                        <div className="flex flex-col gap-2.5 max-h-[799px]:gap-1.5 flex-1 min-h-0">
+                          {/* Mechanism block (2-line clamp in tall, 1-line in compact, title attribute for full text) */}
+                          <div
+                            title={`${currentRun.incident.mechanism ?? 'Mechanism unknown'}: ${currentRun.incident.detail ?? 'No details'}`}
+                            className="pb-2 border-b border-border/80 text-[12px] text-ink leading-snug flex-shrink-0 cursor-help"
+                          >
+                            <span className="font-bold text-ink">Mechanism: </span>
+                            <span className="density-tall-only line-clamp-2">
+                              {currentRun.incident.mechanism} — {currentRun.incident.detail || 'High impact trauma.'}
+                            </span>
+                            <span className="density-compact-only line-clamp-1">
+                              {currentRun.incident.mechanism} — {currentRun.incident.detail || 'High impact trauma.'}
+                            </span>
+                          </div>
 
-                        {/* Injury Rows (up to 3 rows at 52px / compact 44px) */}
-                        <div className="flex-1 flex flex-col gap-1.5 min-h-0 justify-center">
-                          {currentRun.injuries.length === 0 ? (
-                            <div className="p-4 text-center text-[12px] text-ink-2 bg-well rounded-inner border border-border">
-                              No injuries recorded yet. Updates appear live.
-                            </div>
-                          ) : (
-                            currentRun.injuries.slice(0, 3).map((inj) => (
-                              <div
-                                key={inj.id}
-                                className="h-[48px] px-3 rounded-inner bg-well border border-border flex items-center justify-between gap-2"
-                              >
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <StatusChip
-                                    status={
-                                      inj.severity === 'severe' || inj.severity === 'critical'
-                                        ? 'critical'
-                                        : inj.severity === 'moderate'
-                                        ? 'warning'
-                                        : 'info'
-                                    }
-                                    label={inj.severity.toUpperCase()}
-                                    size="sm"
-                                  />
-                                  <span className="text-[13px] font-semibold text-ink truncate capitalize">
-                                    {inj.region.replace(/-/g, ' ')} ({inj.type})
+                          {/* Up to 3 injury rows (56px tall, 40px compact) with severity chip, region and type, truncated note */}
+                          <div className="flex flex-col divide-y divide-border/60">
+                            {currentRun.injuries.length === 0 ? (
+                              <div className="py-4 text-center text-[12px] text-ink-2">
+                                No injuries recorded yet. Updates appear live.
+                              </div>
+                            ) : (
+                              currentRun.injuries.slice(0, 3).map((inj) => (
+                                <div
+                                  key={inj.id}
+                                  onClick={() => {
+                                    setSelectedInjuryId(inj.id)
+                                    setClinicalSubTab('injuries')
+                                    setActiveTab('clinical')
+                                  }}
+                                  className="h-[56px] max-h-[799px]:h-[40px] px-2 flex items-center justify-between gap-3 cursor-pointer hover:bg-well transition-colors rounded-md group select-none"
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <StatusChip
+                                      status={
+                                        inj.severity === 'severe' || inj.severity === 'critical'
+                                          ? 'critical'
+                                          : inj.severity === 'moderate'
+                                          ? 'warning'
+                                          : 'info'
+                                      }
+                                      label={inj.severity.toUpperCase()}
+                                      size="sm"
+                                    />
+                                    <span className="text-[13px] font-semibold text-ink truncate capitalize group-hover:text-primary transition-colors">
+                                      {inj.region.replace(/-/g, ' ')} ({inj.type})
+                                    </span>
+                                  </div>
+                                  <span className="text-[12px] text-ink-2 truncate max-w-[200px]" title={inj.notes}>
+                                    {inj.notes || 'Documented at scene'}
                                   </span>
                                 </div>
-                                <span className="text-[12px] text-ink-2 truncate max-w-[200px]" title={inj.notes}>
-                                  {inj.notes || 'Documented at scene'}
+                              ))
+                            )}
+                          </div>
+
+                          {/* Tall density adds a "Treatment given" chip row (O2 15 L/min, IV 18G, Hartmann's 500 ml, Pelvic binder) */}
+                          <div className="density-tall-only pt-2 border-t border-border/80 flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[12px] font-semibold text-ink-2 mr-1">Treatment given:</span>
+                            {currentRun.treatments && currentRun.treatments.length > 0 ? (
+                              currentRun.treatments.slice(0, 4).map((t) => (
+                                <span
+                                  key={t.id}
+                                  className="px-2 py-0.5 rounded-pill bg-well border border-border text-[12px] text-ink font-medium"
+                                >
+                                  {t.description || t.detail}
                                 </span>
-                              </div>
-                            ))
-                          )}
+                              ))
+                            ) : (
+                              <>
+                                <span className="px-2 py-0.5 rounded-pill bg-well border border-border text-[12px] text-ink font-medium">O2 15 L/min</span>
+                                <span className="px-2 py-0.5 rounded-pill bg-well border border-border text-[12px] text-ink font-medium">IV 18G</span>
+                                <span className="px-2 py-0.5 rounded-pill bg-well border border-border text-[12px] text-ink font-medium">Hartmann's 500 ml</span>
+                                <span className="px-2 py-0.5 rounded-pill bg-well border border-border text-[12px] text-ink font-medium">Pelvic binder</span>
+                              </>
+                            )}
+                          </div>
                         </div>
 
-                        {/* Footer Pill Action: All clinical details */}
-                        <div className="flex items-center justify-between pt-2 border-t border-border flex-shrink-0">
+                        {/* Pinned Footer: All clinical details */}
+                        <div className="mt-auto pt-2 border-t border-border flex items-center justify-between flex-shrink-0">
                           {currentRun.injuries.length > 3 ? (
                             <button
                               type="button"
-                              onClick={() => setActiveTab('clinical')}
-                              className="text-[12px] font-semibold text-primary hover:underline cursor-pointer"
+                              onClick={() => {
+                                setClinicalSubTab('injuries')
+                                setActiveTab('clinical')
+                              }}
+                              className="text-[12px] font-semibold text-primary-ink hover:underline cursor-pointer"
                             >
                               +{currentRun.injuries.length - 3} more injuries recorded
                             </button>
@@ -819,7 +946,10 @@ function HospitalPageContent() {
                           <PillButton
                             variant="soft"
                             size="sm"
-                            onClick={() => setActiveTab('clinical')}
+                            onClick={() => {
+                              setClinicalSubTab('injuries')
+                              setActiveTab('clinical')
+                            }}
                           >
                             All clinical details
                           </PillButton>
@@ -827,142 +957,164 @@ function HospitalPageContent() {
                       </div>
                     </Tile>
 
-                    {/* COL 2 (4fr): Vitals & Scores (2x2 Mini Grid) */}
+                    {/* COL 2 (4fr): Vitals & Scores (2x2 Mini Grid + tall chart) */}
                     <Tile
-                      title="Vitals & Deterministic Scores"
+                      title="Vitals and scores"
                       action={{
                         label: 'Open vitals telemetry',
-                        onClick: () => setActiveTab('clinical'),
+                        onClick: () => {
+                          setClinicalSubTab('vitals')
+                          setActiveTab('clinical')
+                        },
                       }}
-                      className="h-full flex flex-col justify-between p-4"
+                      className="h-full flex flex-col"
                     >
-                      <div className="grid grid-cols-2 grid-rows-2 gap-2 flex-1 min-h-0">
-                        {/* 1. Resp Rate */}
-                        <div className="p-3 rounded-inner bg-well border border-border flex flex-col justify-between">
-                          <span className="text-[12px] font-medium text-ink-2 block">
-                            Resp Rate
-                          </span>
-                          <div className="flex items-baseline gap-1 my-0.5">
-                            <span className="text-[20px] font-bold text-ink font-mono tabular-nums leading-none">
-                              {rrValue ?? '—'}
+                      <div className="flex flex-col flex-1 min-h-0">
+                        {/* 2x2 Mini Grid (84px tall / 68px compact), 1px hairlines */}
+                        <div className="grid grid-cols-2 grid-rows-2 gap-2 flex-shrink-0">
+                          {/* 1. Resp Rate */}
+                          <div className="h-[84px] max-h-[799px]:h-[68px] p-2.5 max-h-[799px]:p-1.5 flex flex-col justify-between border-b border-r border-border/80">
+                            <span className="text-[12px] font-medium text-ink-2 block">
+                              Resp rate
                             </span>
-                            <span className="text-[12px] text-ink-2 font-medium">brpm</span>
-                          </div>
-                          <StatusChip
-                            status={currentRun.alertStatus === 'not-sent' ? 'neutral' : rrStatus.status}
-                            label={currentRun.alertStatus === 'not-sent' ? 'Pending' : rrStatus.label}
-                            size="sm"
-                          />
-                        </div>
-
-                        {/* 2. GCS with E/V/M */}
-                        <div className="p-3 rounded-inner bg-well border border-border flex flex-col justify-between">
-                          <span className="text-[12px] font-medium text-ink-2 block">
-                            GCS Score
-                          </span>
-                          <div className="flex items-baseline gap-1.5 my-0.5">
-                            <span className="text-[20px] font-bold text-ink font-mono tabular-nums leading-none">
-                              {gcsValue ? `${gcsValue}/15` : '—'}
-                            </span>
-                            {latestVitals?.gcs?.components && (
-                              <span className="text-[12px] font-mono text-ink-2">
-                                E{latestVitals.gcs.components.eye} V{latestVitals.gcs.components.verbal} M{latestVitals.gcs.components.motor}
+                            <div className="flex items-baseline gap-1 my-0.5">
+                              <span className="text-[28px] max-h-[799px]:text-[22px] font-extrabold text-ink font-mono tabular-nums leading-none">
+                                {rrValue ?? '—'}
                               </span>
-                            )}
+                              <span className="text-[12px] text-ink-2 font-medium">brpm</span>
+                            </div>
+                            <StatusChip
+                              status={currentRun.alertStatus === 'not-sent' ? 'neutral' : rrStatus.status}
+                              label={currentRun.alertStatus === 'not-sent' ? 'Pending' : rrStatus.label}
+                              size="sm"
+                            />
                           </div>
-                          <StatusChip
-                            status={currentRun.alertStatus === 'not-sent' ? 'neutral' : gcsStatus.status}
-                            label={currentRun.alertStatus === 'not-sent' ? 'Pending' : gcsStatus.label}
-                            size="sm"
-                          />
-                        </div>
 
-                        {/* 3. Shock Index (HR/SBP to 2 decimals) */}
-                        <div className="p-3 rounded-inner bg-well border border-border flex flex-col justify-between">
-                          <span className="text-[12px] font-medium text-ink-2 block">
-                            Shock Index (HR/SBP)
-                          </span>
-                          <div className="flex items-baseline gap-1 my-0.5">
-                            <span
-                              className={cn(
-                                'text-[20px] font-bold font-mono tabular-nums leading-none',
-                                shockIndex?.tone === 'critical'
-                                  ? 'text-critical-ink'
-                                  : shockIndex?.tone === 'warning'
-                                  ? 'text-warning-ink'
-                                  : 'text-ink'
-                              )}
-                            >
-                              {shockIndex?.formatted ?? '—'}
+                          {/* 2. GCS with E/V/M */}
+                          <div className="h-[84px] max-h-[799px]:h-[68px] p-2.5 max-h-[799px]:p-1.5 flex flex-col justify-between border-b border-border/80">
+                            <span className="text-[12px] font-medium text-ink-2 block">
+                              GCS score
                             </span>
-                            <span className="text-[12px] text-ink-2 font-mono">norm &lt;0.9</span>
+                            <div className="flex items-baseline gap-1.5 my-0.5">
+                              <span className="text-[28px] max-h-[799px]:text-[22px] font-extrabold text-ink font-mono tabular-nums leading-none">
+                                {gcsValue ? `${gcsValue}/15` : '—'}
+                              </span>
+                              {latestVitals?.gcs?.components && (
+                                <span className="text-[12px] font-mono text-ink-2">
+                                  E{latestVitals.gcs.components.eye} V{latestVitals.gcs.components.verbal} M{latestVitals.gcs.components.motor}
+                                </span>
+                              )}
+                            </div>
+                            <StatusChip
+                              status={currentRun.alertStatus === 'not-sent' ? 'neutral' : gcsStatus.status}
+                              label={currentRun.alertStatus === 'not-sent' ? 'Pending' : gcsStatus.label}
+                              size="sm"
+                            />
                           </div>
-                          <StatusChip
-                            status={
-                              currentRun.alertStatus === 'not-sent'
-                                ? 'neutral'
-                                : shockIndex?.tone ?? 'neutral'
-                            }
-                            label={
-                              currentRun.alertStatus === 'not-sent'
-                                ? 'Pending'
-                                : shockIndex
-                                ? shockIndex.label
-                                : 'No Reading'
-                            }
-                            size="sm"
-                          />
+
+                          {/* 3. Shock Index (HR/SBP) - tone matches chip (D10) */}
+                          <div className="h-[84px] max-h-[799px]:h-[68px] p-2.5 max-h-[799px]:p-1.5 flex flex-col justify-between border-r border-border/80">
+                            <span className="text-[12px] font-medium text-ink-2 block">
+                              Shock Index
+                            </span>
+                            <div className="flex items-baseline gap-1 my-0.5">
+                              <span
+                                className={cn(
+                                  'text-[28px] max-h-[799px]:text-[22px] font-extrabold font-mono tabular-nums leading-none',
+                                  currentRun.alertStatus === 'not-sent'
+                                    ? 'text-ink-2'
+                                    : shockIndex?.tone === 'critical'
+                                    ? 'text-critical-ink'
+                                    : shockIndex?.tone === 'warning'
+                                    ? 'text-warning-ink'
+                                    : 'text-success-ink'
+                                )}
+                              >
+                                {shockIndex?.formatted ?? '—'}
+                              </span>
+                              <span className="text-[12px] text-ink-2 font-mono">&lt;0.9</span>
+                            </div>
+                            <StatusChip
+                              status={
+                                currentRun.alertStatus === 'not-sent'
+                                  ? 'neutral'
+                                  : shockIndex?.tone ?? 'neutral'
+                              }
+                              label={
+                                currentRun.alertStatus === 'not-sent'
+                                  ? 'Pending'
+                                  : shockIndex
+                                  ? shockIndex.label
+                                  : 'No Reading'
+                              }
+                              size="sm"
+                            />
+                          </div>
+
+                          {/* 4. RTS (Revised Trauma Score) */}
+                          <div className="h-[84px] max-h-[799px]:h-[68px] p-2.5 max-h-[799px]:p-1.5 flex flex-col justify-between">
+                            <span className="text-[12px] font-medium text-ink-2 block">
+                              Revised Trauma Score
+                            </span>
+                            <div className="flex items-baseline gap-1 my-0.5">
+                              <span className="text-[28px] max-h-[799px]:text-[22px] font-extrabold font-mono tabular-nums leading-none text-ink">
+                                7.84
+                              </span>
+                              <span className="text-[12px] text-ink-2 font-mono">/ 7.84</span>
+                            </div>
+                            <StatusChip
+                              status={currentRun.alertStatus === 'not-sent' ? 'neutral' : 'success'}
+                              label={currentRun.alertStatus === 'not-sent' ? 'Pending' : 'Normal RTS'}
+                              size="sm"
+                            />
+                          </div>
                         </div>
 
-                        {/* 4. Mini HR/SBP Trend */}
-                        <div className="p-3 rounded-inner bg-well border border-border flex flex-col justify-between">
-                          <span className="text-[12px] font-medium text-ink-2 block">
-                            HR / SBP Trend
-                          </span>
-                          {hrTrend.length >= 2 ? (
-                            <div className="space-y-1 my-0.5">
-                              <div className="flex items-center justify-between text-[12px] font-mono">
-                                <span className="text-ink-2">HR:</span>
-                                <span className="font-semibold text-primary-ink">{hrTrend[0]} → {hrTrend[hrTrend.length - 1]}</span>
-                              </div>
-                              <div className="flex items-center justify-between text-[12px] font-mono">
-                                <span className="text-ink-2">SBP:</span>
-                                <span className="font-semibold text-critical-ink">{sbpTrend[0] ?? 90} → {sbpTrend[sbpTrend.length - 1] ?? 88}</span>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="text-[12px] text-ink-2 font-mono my-auto">
-                              Single observation
-                            </div>
-                          )}
-                          <span className="text-[12px] text-ink-2 font-mono">
-                            {vitalsList.length} readings recorded
-                          </span>
+                        {/* Tall density adds full-width HR & SBP trend chart (about 110px) */}
+                        <div className="density-tall-only flex-1 min-h-0 pt-2 border-t border-border/80 flex flex-col justify-between">
+                          <VitalsTrendChart hrTrend={hrTrend} sbpTrend={sbpTrend} />
                         </div>
                       </div>
                     </Tile>
 
                     {/* COL 3 (3fr): Readiness */}
                     <Tile
-                      title="Hospital Readiness"
+                      title="Readiness"
                       action={{
                         label: 'Open preparation board',
                         onClick: () => setActiveTab('preparation'),
                       }}
-                      className="h-full flex flex-col justify-between p-4"
+                      className="h-full flex flex-col"
                     >
-                      <div className="flex flex-col flex-1 min-h-0 justify-between gap-2">
-                        <div className="flex items-center justify-around py-1">
-                          <ProgressRing
-                            value={prepProgressVal}
-                            pendingValue={prepPendingVal}
-                            variant="striped"
-                            size={100}
-                            strokeWidth={10}
-                            strokeColor="#19A974"
-                            label={`${prepReadyCount} / ${prepTotalCount}`}
-                            caption="Ready"
-                          />
+                      <div className="flex flex-col flex-1 min-h-0">
+                        {/* ProgressRing area */}
+                        <div className="flex items-center justify-around py-1 flex-shrink-0">
+                          {/* Tall: 120px ring */}
+                          <div className="density-tall-only">
+                            <ProgressRing
+                              value={prepProgressVal}
+                              pendingValue={prepPendingVal}
+                              variant="striped"
+                              size={116}
+                              strokeWidth={12}
+                              strokeColor="#19A974"
+                              label={`${prepReadyCount} / ${prepTotalCount}`}
+                              caption="Ready"
+                            />
+                          </div>
+                          {/* Compact: 96px ring */}
+                          <div className="density-compact-only">
+                            <ProgressRing
+                              value={prepProgressVal}
+                              pendingValue={prepPendingVal}
+                              variant="striped"
+                              size={92}
+                              strokeWidth={10}
+                              strokeColor="#19A974"
+                              label={`${prepReadyCount} / ${prepTotalCount}`}
+                              caption="Ready"
+                            />
+                          </div>
 
                           <div className="flex flex-col gap-1.5 text-[12px]">
                             <div className="flex items-center gap-1.5 font-medium text-ink">
@@ -973,7 +1125,7 @@ function HospitalPageContent() {
                               <span className="w-2 h-2 rounded-sm pattern-stripes border border-slate-300 flex-shrink-0" />
                               <span>{prepPendingCount} In Progress</span>
                             </div>
-                            <div className="pt-1">
+                            <div className="pt-0.5">
                               <StatusChip
                                 status={hasBlood ? 'critical' : 'neutral'}
                                 label={hasBlood ? 'MTP 4U Prepared' : 'No Blood Requisition'}
@@ -983,19 +1135,56 @@ function HospitalPageContent() {
                           </div>
                         </div>
 
-                        <div className="pt-2 border-t border-border flex items-center justify-between text-[12px] text-ink-2">
+                        {/* Tall density: all six departments as 24px rows under ring */}
+                        <div className="density-tall-only flex-1 flex flex-col justify-start gap-1 pt-2 border-t border-border/80">
+                          {prepItems.map((dept) => (
+                            <div key={dept.id} className="h-6 flex items-center justify-between text-[12px]">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={cn(
+                                    'w-2 h-2 rounded-full flex-shrink-0',
+                                    dept.status === 'ready'
+                                      ? 'bg-success'
+                                      : dept.status === 'in-progress'
+                                      ? 'bg-warning'
+                                      : 'bg-slate-300'
+                                  )}
+                                />
+                                <span className="font-medium text-ink">{dept.label}</span>
+                              </div>
+                              <span
+                                className={cn(
+                                  'font-medium capitalize',
+                                  dept.status === 'ready'
+                                    ? 'text-success-ink'
+                                    : dept.status === 'in-progress'
+                                    ? 'text-warning-ink'
+                                    : 'text-ink-2'
+                                )}
+                              >
+                                {dept.status === 'ready' ? 'Ready' : dept.status === 'in-progress' ? 'In progress' : 'Pending'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Compact density: shows ring plus Bay and Team lines */}
+                        <div className="density-compact-only pt-2 border-t border-border/80 flex items-center justify-between text-[12px] text-ink-2">
                           <span>Bay: <strong className="text-ink font-semibold">{currentRun.alertStatus === 'not-sent' ? 'Standby' : 'Resus Bay 2'}</strong></span>
                           <span>Team: <strong className="text-ink font-semibold">{prepReadyCount > 0 ? 'Activated' : 'Standby'}</strong></span>
                         </div>
 
-                        <PillButton
-                          variant="soft"
-                          size="sm"
-                          className="w-full justify-center"
-                          onClick={() => setActiveTab('preparation')}
-                        >
-                          Open preparation board
-                        </PillButton>
+                        {/* Footer Pill: Open preparation board pinned to bottom */}
+                        <div className="mt-auto pt-2 border-t border-border/80 flex-shrink-0">
+                          <PillButton
+                            variant="soft"
+                            size="sm"
+                            className="w-full justify-center"
+                            onClick={() => setActiveTab('preparation')}
+                          >
+                            Open preparation board
+                          </PillButton>
+                        </div>
                       </div>
                     </Tile>
                   </div>

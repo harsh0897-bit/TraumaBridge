@@ -416,3 +416,17 @@ body {
   );
 }
 
+/* ── Density Scaling (Tall >= 800px vs Compact < 800px) ─────────────────── */
+@media (min-height: 800px) {
+  .density-compact-only {
+    display: none !important;
+  }
+}
+
+@media (max-height: 799px) {
+  .density-tall-only {
+    display: none !important;
+  }
+}
+
+

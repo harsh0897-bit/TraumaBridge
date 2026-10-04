@@ -46,7 +46,7 @@ export function StatNumber({
         <span
           className={cn(
             'font-extrabold tracking-tight tabular-nums',
-            isHero ? 'text-[64px] leading-none' : 'text-[44px] leading-none',
+            isHero ? 'text-[64px] max-h-[799px]:text-[48px] leading-none' : 'text-[44px] max-h-[799px]:text-[32px] leading-none',
             textColor ?? 'text-ink'
           )}
         >

@@ -61,7 +61,7 @@ export function SegmentedTabs({
       role="tablist"
       aria-orientation="horizontal"
       className={cn(
-        'inline-flex items-center gap-1 p-1 bg-well rounded-pill border border-border select-none',
+        'inline-flex items-center gap-1 p-1 bg-tile rounded-pill border border-border select-none shadow-none',
         className
       )}
     >
@@ -88,7 +88,7 @@ export function SegmentedTabs({
               'relative rounded-pill font-semibold transition-colors flex items-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1',
               // Strict >=12px rule
               size === 'sm' ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-[13px]',
-              isActive ? 'text-primary' : 'text-ink-2 hover:text-ink hover:bg-black/2',
+              isActive ? 'text-primary-ink' : 'text-ink-2 hover:text-ink hover:bg-well',
               tab.disabled && 'opacity-40 cursor-not-allowed'
             )}
           >
@@ -96,7 +96,7 @@ export function SegmentedTabs({
             {isActive && (
               <motion.div
                 layoutId={reducedMotion ? undefined : layoutId}
-                className="absolute inset-0 bg-primary-soft border border-primary/20 rounded-pill shadow-xs"
+                className="absolute inset-0 bg-primary-soft border border-primary/20 rounded-pill"
                 transition={spring}
               />
             )}
@@ -113,8 +113,8 @@ export function SegmentedTabs({
                 className={cn(
                   'relative z-10 font-bold px-2 py-0.5 rounded-pill text-xs tabular-nums',
                   isActive
-                    ? 'bg-primary text-white'
-                    : 'bg-tile text-ink-2 border border-border'
+                    ? 'bg-primary-ink text-white'
+                    : 'bg-well text-ink-2 border border-border'
                 )}
               >
                 {tab.count}

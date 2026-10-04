@@ -81,7 +81,7 @@ export function Countdown({
   const isDark = tone === 'dark'
 
   const sizeClasses = {
-    hero: 'text-[64px] font-mono leading-none tracking-tight font-bold tabular-nums',
+    hero: 'text-[64px] max-h-[799px]:text-[48px] font-mono leading-none tracking-tight font-bold tabular-nums',
     inline: 'text-[16px] font-mono leading-tight font-semibold tabular-nums',
     sm: 'text-[12px] font-mono leading-tight font-medium tabular-nums',
     md: 'text-[14px] font-mono leading-tight font-semibold tabular-nums',
