@@ -535,9 +535,8 @@ function HospitalPageContent() {
                     </span>
                   </div>
 
-                  {/* Patient Line */}
                   <div className="font-semibold text-[13px] text-ink truncate">
-                    {pLab.title} <span className="font-normal text-ink-2">({pLab.sub})</span>
+                    {pLab.title}{pLab.sub ? <span className="font-normal text-ink-2"> ({pLab.sub})</span> : null}
                   </div>
 
                   {/* Mechanism */}
@@ -927,23 +926,23 @@ function HospitalPageContent() {
                           </div>
 
                           {/* Tall density adds a "Treatment given" chip row (O2 15 L/min, IV 18G, Hartmann's 500 ml, Pelvic binder) */}
-                          <div className="density-tall-only pt-2 border-t border-border/80 flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[12px] font-semibold text-ink-2 mr-1">Treatment given:</span>
+                          <div className="density-tall-only pt-2 border-t border-border/80 flex items-center gap-1.5 flex-nowrap overflow-hidden">
+                            <span className="text-[12px] font-semibold text-ink-2 mr-1 flex-shrink-0">Treatment given:</span>
                             {currentRun.treatments && currentRun.treatments.length > 0 ? (
                               currentRun.treatments.slice(0, 4).map((t) => (
                                 <span
                                   key={t.id}
-                                  className="px-2 py-0.5 rounded-pill bg-well border border-border text-[12px] text-ink font-medium"
+                                  className="px-2 py-0.5 rounded-pill bg-well border border-border text-[12px] text-ink font-medium flex-shrink-0 truncate max-w-[120px]"
                                 >
                                   {t.description || t.detail}
                                 </span>
                               ))
                             ) : (
                               <>
-                                <span className="px-2 py-0.5 rounded-pill bg-well border border-border text-[12px] text-ink font-medium">O2 15 L/min</span>
-                                <span className="px-2 py-0.5 rounded-pill bg-well border border-border text-[12px] text-ink font-medium">IV 18G</span>
-                                <span className="px-2 py-0.5 rounded-pill bg-well border border-border text-[12px] text-ink font-medium">Hartmann's 500 ml</span>
-                                <span className="px-2 py-0.5 rounded-pill bg-well border border-border text-[12px] text-ink font-medium">Pelvic binder</span>
+                                <span className="px-2 py-0.5 rounded-pill bg-well border border-border text-[12px] text-ink font-medium flex-shrink-0">O2 15 L/min</span>
+                                <span className="px-2 py-0.5 rounded-pill bg-well border border-border text-[12px] text-ink font-medium flex-shrink-0">IV 18G</span>
+                                <span className="px-2 py-0.5 rounded-pill bg-well border border-border text-[12px] text-ink font-medium flex-shrink-0">Hartmann&apos;s 500 ml</span>
+                                <span className="px-2 py-0.5 rounded-pill bg-well border border-border text-[12px] text-ink font-medium flex-shrink-0">Pelvic binder</span>
                               </>
                             )}
                           </div>
@@ -1031,7 +1030,7 @@ function HospitalPageContent() {
                             </div>
                             <StatusChip
                               status={currentRun.alertStatus === 'not-sent' ? 'neutral' : gcsStatus.status}
-                              label={currentRun.alertStatus === 'not-sent' ? 'Pending' : gcsStatus.label}
+                              label={currentRun.alertStatus === 'not-sent' ? 'Pending' : gcsStatus.status === 'warning' ? 'Mild Impairment' : gcsStatus.label}
                               size="sm"
                             />
                           </div>

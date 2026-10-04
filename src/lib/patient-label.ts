@@ -26,15 +26,16 @@ export function patientLabel(
   }
 
   // Extract patient record
-  const p: Partial<Patient> = 'patient' in runOrPatient && runOrPatient.patient
+  const p: any = 'patient' in runOrPatient && runOrPatient.patient
     ? runOrPatient.patient
-    : (runOrPatient as Partial<Patient>)
+    : (runOrPatient as any)
 
   const hasName = Boolean(p.name && p.name.trim().length > 0)
-  const isUnknown = p.identity === 'unknown' || !hasName
+  const isUnknown = p.identity === 'unknown' || p.identityStatus === 'unknown' || !hasName
+  const ageVal = p.age ?? p.estimatedAge
 
   if (!isUnknown && p.name) {
-    const ageStr = p.age ? `${p.age} y` : ''
+    const ageStr = ageVal ? `${ageVal} y` : ''
     return {
       title: p.name,
       sub: ageStr,
@@ -47,7 +48,7 @@ export function patientLabel(
   const sexLabel = sex === 'female' ? 'female' : sex === 'male' ? 'male' : 'patient'
   const title = `Unidentified ${sexLabel}`
 
-  const ageStr = p.age ? `~${p.age} y` : '~38 y'
+  const ageStr = ageVal ? `~${ageVal} y` : '~38 y'
 
   return {
     title,
