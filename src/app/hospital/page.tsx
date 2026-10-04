@@ -207,6 +207,8 @@ function HospitalPageContent() {
   const [hoveredRegionId, setHoveredRegionId] = useState<string | null>(null)
   const [mechanismDetailsOpen, setMechanismDetailsOpen] = useState(false)
   const [mistCopiedToast, setMistCopiedToast] = useState(false)
+  const [activityCategory, setActivityCategory] = useState<'all' | 'vitals' | 'treatment' | 'system' | 'hospital'>('all')
+  const activityScrollRef = useRef<HTMLDivElement>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [mounted, setMounted] = useState(false)
   const [nowString, setNowString] = useState('23:40:00')
@@ -224,6 +226,13 @@ function HospitalPageContent() {
     const timer = setInterval(updateTime, 1000)
     return () => clearInterval(timer)
   }, [])
+
+  // Activity Tab opens scrolled to the TOP with first row fully visible
+  useEffect(() => {
+    if (activeTab === 'activity') {
+      activityScrollRef.current?.scrollTo({ top: 0, behavior: 'instant' })
+    }
+  }, [activeTab, selectedCaseId])
 
   // Cases setup: Unsent state of Alpha 7 is reachable ONLY via ?state=unsent
   const seededAlphaRun: EmergencyRun = activeRun && activeRun.alertStatus !== 'not-sent' ? activeRun : DEMO_RUN
@@ -2261,7 +2270,7 @@ function HospitalPageContent() {
               )}
 
               {/* ───────────────────────────────────────────────────────────── */}
-              {/* TAB 4: ACTIVITY (Mounted inside bounded scroll)                */}
+              {/* TAB 4: ACTIVITY (Continuous vertical rail, sticky filter chips, internal scroll only) */}
               {/* ───────────────────────────────────────────────────────────── */}
               {activeTab === 'activity' && (
                 <motion.div
@@ -2270,32 +2279,173 @@ function HospitalPageContent() {
                   initial="hidden"
                   animate="visible"
                   exit="exit"
-                  className="h-full flex flex-col overflow-hidden"
+                  className="h-full flex flex-col overflow-hidden bg-tile rounded-[20px] border border-border p-5 shadow-xs"
                 >
-                  <Tile
-                    title={`Chronological Case Activity Stream (${currentRun.events.length} Events)`}
-                    className="h-full flex flex-col justify-between"
-                  >
-                    <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 min-h-0">
-                      {currentRun.events.map((ev) => (
-                        <div
-                          key={ev.id}
-                          className="p-3 rounded-inner bg-well border border-border flex items-center justify-between text-[12px] gap-3"
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
-                            <span className="font-semibold text-ink truncate text-[13px]">
-                              {ev.description}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-3 text-ink-2 font-mono flex-shrink-0 text-[12px]">
-                            <span>{ev.operator ?? ev.source}</span>
-                            <span>{formatClock(ev.timestamp)}</span>
-                          </div>
-                        </div>
-                      ))}
+                  {/* Activity Top Header */}
+                  <div className="flex items-center justify-between pb-3 border-b border-border/80 shrink-0">
+                    <div>
+                      <h3 className="text-[15px] font-bold text-ink">
+                        Chronological Case Activity Stream
+                      </h3>
+                      <span className="text-[12px] text-ink-2">
+                        Real-time pre-hospital telemetry and hospital receiving milestones
+                      </span>
                     </div>
-                  </Tile>
+                    <span className="text-[12px] font-mono text-ink-2 font-semibold">
+                      {currentRun.events.length} Events ({currentRun.callsign})
+                    </span>
+                  </div>
+
+                  {/* Sticky Filter Chips & Timeline Rail */}
+                  {(() => {
+                    const sortedEvents = [...currentRun.events].sort(
+                      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+                    )
+
+                    const eventCounts = {
+                      all: sortedEvents.length,
+                      vitals: sortedEvents.filter((e) => {
+                        const t = e.type.toLowerCase()
+                        const d = e.description.toLowerCase()
+                        return t.includes('vital') || d.includes('vital') || d.includes('hr ') || d.includes('sbp ')
+                      }).length,
+                      treatment: sortedEvents.filter((e) => {
+                        const t = e.type.toLowerCase()
+                        const d = e.description.toLowerCase()
+                        return t.includes('treatment') || d.includes('treatment') || d.includes('iv ') || d.includes('o₂') || d.includes('binder')
+                      }).length,
+                      hospital: sortedEvents.filter((e) => {
+                        const t = e.type.toLowerCase()
+                        const d = e.description.toLowerCase()
+                        return e.source === 'hospital' || t.includes('prep') || t.includes('blood') || d.includes('blood') || d.includes('bay')
+                      }).length,
+                      system: sortedEvents.filter((e) => {
+                        const t = e.type.toLowerCase()
+                        return e.source === 'system' || t.includes('alert') || t.includes('run') || t.includes('departure') || t.includes('incident') || t.includes('patient')
+                      }).length,
+                    }
+
+                    const filteredEvents = sortedEvents.filter((ev) => {
+                      if (activityCategory === 'all') return true
+                      const t = ev.type.toLowerCase()
+                      const d = ev.description.toLowerCase()
+                      if (activityCategory === 'vitals') return t.includes('vital') || d.includes('vital') || d.includes('hr ') || d.includes('sbp ')
+                      if (activityCategory === 'treatment') return t.includes('treatment') || d.includes('treatment') || d.includes('iv ') || d.includes('o₂') || d.includes('binder')
+                      if (activityCategory === 'hospital') return ev.source === 'hospital' || t.includes('prep') || t.includes('blood') || d.includes('blood') || d.includes('bay')
+                      if (activityCategory === 'system') return ev.source === 'system' || t.includes('alert') || t.includes('run') || t.includes('departure') || t.includes('incident') || t.includes('patient')
+                      return true
+                    })
+
+                    return (
+                      <>
+                        <div className="py-2.5 border-b border-border/60 shrink-0 flex items-center gap-1.5 flex-wrap">
+                          {[
+                            { id: 'all', label: 'All', count: eventCounts.all },
+                            { id: 'vitals', label: 'Vitals', count: eventCounts.vitals },
+                            { id: 'treatment', label: 'Treatment', count: eventCounts.treatment },
+                            { id: 'hospital', label: 'Hospital', count: eventCounts.hospital },
+                            { id: 'system', label: 'System', count: eventCounts.system },
+                          ].map((cat) => {
+                            const isSelected = activityCategory === cat.id
+                            return (
+                              <button
+                                key={cat.id}
+                                type="button"
+                                onClick={() => setActivityCategory(cat.id as typeof activityCategory)}
+                                className={`px-3 py-1 rounded-pill text-[12px] font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-primary text-white font-semibold shadow-xs'
+                                    : 'bg-well text-ink-2 hover:text-ink hover:bg-tile border border-border'
+                                }`}
+                              >
+                                <span>{cat.label}</span>
+                                <span
+                                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                                    isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 text-ink-2'
+                                  }`}
+                                >
+                                  {cat.count}
+                                </span>
+                              </button>
+                            )
+                          })}
+                        </div>
+
+                        {/* Continuous Vertical Rail Timeline List */}
+                        <div
+                          ref={activityScrollRef}
+                          className="flex-1 overflow-y-auto min-h-0 pt-4 pb-4 pr-2 relative"
+                        >
+                          {filteredEvents.length === 0 ? (
+                            <div className="py-12 text-center text-[12px] text-ink-2">
+                              No events found matching this filter category.
+                            </div>
+                          ) : (
+                            <div className="relative border-l-2 border-border ml-5 pl-5 space-y-4">
+                              {filteredEvents.map((ev, idx) => {
+                                const isOlderThan10Min =
+                                  mounted &&
+                                  ev.timestamp &&
+                                  Date.now() - new Date(ev.timestamp).getTime() > 10 * 60 * 1000
+
+                                const dotColor =
+                                  ev.source === 'ambulance'
+                                    ? 'bg-primary'
+                                    : ev.source === 'hospital'
+                                    ? 'bg-success'
+                                    : 'bg-slate-400'
+
+                                return (
+                                  <motion.div
+                                    key={ev.id || idx}
+                                    initial={{ opacity: 0, y: -4 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: durations.fast, ease }}
+                                    className="relative text-[12px] group py-0.5"
+                                  >
+                                    {/* Continuous Rail Actor Dot */}
+                                    <span
+                                      className={`absolute -left-[27px] top-1.5 w-3 h-3 rounded-full border-2 border-white ring-1 ring-border shadow-xs ${dotColor}`}
+                                    />
+
+                                    {/* Event Body */}
+                                    <div className="flex items-start justify-between gap-4">
+                                      <div className="min-w-0 flex-1">
+                                        <div
+                                          className={`leading-snug ${
+                                            isOlderThan10Min
+                                              ? 'text-ink-2 font-normal'
+                                              : 'text-ink font-semibold'
+                                          }`}
+                                        >
+                                          {ev.description}
+                                        </div>
+                                        <div className="text-[11px] text-ink-2 mt-0.5 font-medium">
+                                          Logged by <strong className="text-ink">{ev.operator || 'Paramedic'}</strong> · Source: <span className="capitalize">{ev.source}</span>
+                                        </div>
+                                      </div>
+
+                                      <div className="text-right shrink-0">
+                                        <span className="font-mono text-[12px] font-medium text-ink-2 block">
+                                          {formatClock(ev.timestamp)}
+                                        </span>
+                                        <span className="text-[11px] text-ink-2 block">
+                                          {mounted ? formatAgo(ev.timestamp) : '—'}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </motion.div>
+                                )
+                              })}
+                            </div>
+                          )}
+
+                          {/* Fade mask at bottom edge */}
+                          <div className="sticky bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-tile to-transparent pointer-events-none" />
+                        </div>
+                      </>
+                    )
+                  })()}
                 </motion.div>
               )}
             </AnimatePresence>
