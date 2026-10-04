@@ -35,3 +35,7 @@ yarn-error.log*
 
 # reference extracts
 Vaidya-stitch-reference-extracted/
+
+# audit reports and generated artifacts
+audit-reports/
+
