@@ -16,6 +16,7 @@ export type WizardStep =
   | 'start'
   | 'patient'
   | 'incident'
+  | 'survey'
   | 'injuries'
   | 'vitals'
   | 'treatments'
@@ -104,11 +105,17 @@ export type InjuryClassification =
 export interface TreatmentEntry {
   id: string
   category: TreatmentCategory
+  /** Catalogue key from the Interventions step (absent on legacy / demo entries) */
+  key?: string
   description: string
   detail?: string
   timestamp: string
   performedBy?: string
   considered?: boolean  // Considered but not performed
+  /** Medication capture */
+  drug?: string
+  dose?: { value: number; unit: string }
+  route?: string
 }
 
 export type TreatmentCategory =
@@ -121,7 +128,37 @@ export type TreatmentCategory =
   | 'cpr'
   | 'analgesia'
   | 'packaging'
+  | 'tourniquet'
+  | 'needle-decompression'
+  | 'chest-seal'
+  | 'txa'
+  | 'medication'
   | 'other'
+
+// ─── Primary Survey (ABCDE) ──────────────────────────────────────────────────
+
+export type AvpuLevel = 'A' | 'V' | 'P' | 'U'
+
+export interface PrimarySurvey {
+  // A — Airway
+  airway?: 'patent' | 'compromised' | 'obstructed'
+  airwayAdjuncts?: string[]
+  // B — Breathing
+  chestRise?: 'symmetrical' | 'asym-left' | 'asym-right'
+  breathSounds?: 'normal' | 'reduced-left' | 'reduced-right' | 'absent' | 'added'
+  breathingFlags?: string[]   // tension-ptx | open-chest | flail
+  // C — Circulation
+  pulse?: 'present' | 'weak' | 'absent'
+  haemorrhage?: 'none' | 'controlled' | 'uncontrolled' | 'internal'
+  // D — Disability
+  avpu?: AvpuLevel
+  pupils?: 'equal-reactive' | 'unequal' | 'fixed-dilated' | 'not-assessed'
+  limbMovement?: 'all-four' | 'arms-only' | 'legs-only' | 'none'
+  // E — Exposure
+  exposureFindings?: string[] // none | bleeding | burns | hypothermia | deformity
+  environment?: string[]      // indoor | outdoor | hot | cold | wet
+  updatedAt?: string
+}
 
 export interface MISTSummary {
   mechanism: string
@@ -129,6 +166,12 @@ export interface MISTSummary {
   injuries: string  // Free-text composite from InjuryRecord[]
   signs: string     // Free-text composite from VitalObservation[]
   treatment: string // Free-text composite from TreatmentEntry[]
+  /** Auto-generated snapshot, used to show which blocks the crew edited */
+  original?: { mechanism: string; injuries: string; signs: string; treatment: string }
+  /** Computed at generation time */
+  shockIndex?: number
+  rts?: number   // weighted RTS (0–7.84)
+  trts?: number  // triage RTS (0–12)
   generatedAt: string
   confirmedBy?: string
   confirmedAt?: string
@@ -251,6 +294,7 @@ export interface EmergencyRun {
     dob?: string
     estimatedAge?: number
     sex?: 'male' | 'female' | 'unknown'
+    allergyStatus?: 'none' | 'present' | 'unknown'
     allergies?: string[]
     abhaId?: string
     emergencyNotes?: string
@@ -264,7 +308,16 @@ export interface EmergencyRun {
     detail?: string
     location?: string
     time?: string
+    casualties?: '1' | '2-4' | '5+' | 'mci'
+    entrapment?: 'no' | 'lt30' | '30-60' | 'gt60'
+    flags?: string[]   // high-energy | spinal | burns | hazmat | arrest
   }
+
+  // Primary survey (ABCDE)
+  primarySurvey?: PrimarySurvey
+
+  // Free crew note appended to the handover
+  crewNotes?: string
 
   // Clinical data
   injuries: InjuryRecord[]

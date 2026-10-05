@@ -23,8 +23,10 @@ import type {
   BloodBankStatus,
   IdentityDocument,
   InjuryPhoto,
+  PrimarySurvey,
 } from '@/types/run'
-import { DEMO_RUN } from '@/data/demoRun'
+import { DEMO_RUN, AVAILABLE_HOSPITALS } from '@/data/demoRun'
+import { buildMist, latestVitals, shockIndex } from '@/lib/clinical'
 
 // ─── Store Shape ──────────────────────────────────────────────────────────────
 
@@ -40,6 +42,8 @@ interface RunStore {
   clearRun: () => void
   setStep: (step: WizardStep) => void
   setRunStatus: (status: EmergencyRun['status']) => void
+  updateRunMeta: (patch: Partial<Pick<EmergencyRun, 'eta' | 'destinationHospitalId' | 'crewLead' | 'callsign'>>) => void
+  setCrewNotes: (text: string) => void
 
   // Actions — Patient & Documents
   updatePatient: (patch: Partial<EmergencyRun['patient']>) => void
@@ -47,6 +51,9 @@ interface RunStore {
 
   // Actions — Incident
   updateIncident: (patch: Partial<EmergencyRun['incident']>) => void
+
+  // Actions — Primary survey (ABCDE)
+  updatePrimarySurvey: (patch: Partial<PrimarySurvey>) => void
 
   // Actions — Injuries & Evidence
   addInjury: (injury: InjuryRecord) => void
@@ -59,6 +66,7 @@ interface RunStore {
 
   // Actions — Treatments
   addTreatment: (t: TreatmentEntry) => void
+  updateTreatment: (id: string, patch: Partial<TreatmentEntry>) => void
   removeTreatment: (id: string) => void
 
   // Actions — MIST
@@ -68,6 +76,8 @@ interface RunStore {
 
   // Actions — Alert
   sendPreAlert: () => void
+  /** Signs the MIST as the crew lead, raises the blood request if flagged, then sends the pre-alert */
+  transmitPreAlert: (opts?: { bloodUnits?: number }) => void
   acknowledgeAlert: (acknowledgedBy: string) => void
 
   // Actions — Blood Bank
@@ -83,6 +93,7 @@ interface RunStore {
 
   // UI
   setNightMode: (v: boolean) => void
+  hydrateNightMode: () => void
   toggleVoiceSim: () => void
 }
 
@@ -100,44 +111,24 @@ function makeEvent(
   return { id: uid(), type, description, timestamp: now(), source, metadata }
 }
 
-// MIST text generators — deterministic, no AI inference
-function generateMechanismText(run: EmergencyRun): string {
-  const code = run.incident.mechanismCode ?? run.incident.mechanism ?? 'Unknown mechanism'
-  const detail = run.incident.detail ? ` — ${run.incident.detail}` : ''
-  return `${code}${detail}`
+/**
+ * Append an event, but collapse rapid repeats of the same kind (e.g. tapping
+ * through steppers or chips) into a single trail entry.
+ */
+function pushEvent(events: RunEvent[], ev: RunEvent): RunEvent[] {
+  const last = events[events.length - 1]
+  if (
+    last &&
+    last.type === ev.type &&
+    last.source === ev.source &&
+    Date.now() - new Date(last.timestamp).getTime() < 20_000
+  ) {
+    return [...events.slice(0, -1), { ...ev, id: last.id }]
+  }
+  return [...events, ev]
 }
 
-function generateInjuryText(injuries: InjuryRecord[]): string {
-  if (injuries.length === 0) return 'No injuries recorded'
-  return injuries
-    .map((inj) => {
-      const lat = inj.laterality !== 'na' ? `(${inj.laterality}) ` : ''
-      return `${lat}${inj.region.replace(/-/g, ' ')} — ${inj.type} [${inj.severity}]${inj.notes ? `: ${inj.notes}` : ''}`
-    })
-    .join('\n')
-}
-
-function generateSignsText(obs: VitalObservation[]): string {
-  if (obs.length === 0) return 'No vitals recorded'
-  const latest = obs[obs.length - 1]
-  const parts: string[] = []
-  if (latest.hr) parts.push(`HR ${latest.hr.value} bpm`)
-  if (latest.sbp && latest.dbp) parts.push(`BP ${latest.sbp.value}/${latest.dbp.value} mmHg`)
-  else if (latest.sbp) parts.push(`SBP ${latest.sbp.value} mmHg`)
-  if (latest.spo2) parts.push(`SpO₂ ${latest.spo2.value}%`)
-  if (latest.rr) parts.push(`RR ${latest.rr.value} brpm`)
-  if (latest.gcs) parts.push(`GCS ${latest.gcs.total}/15`)
-  if (latest.temp) parts.push(`Temp ${latest.temp.value}°C`)
-  return parts.length > 0 ? parts.join(' · ') : 'Vitals pending'
-}
-
-function generateTreatmentText(treatments: TreatmentEntry[]): string {
-  if (treatments.length === 0) return 'No treatments recorded'
-  return treatments
-    .filter((t) => !t.considered)
-    .map((t) => `${t.description}${t.detail ? `: ${t.detail}` : ''}`)
-    .join('\n')
-}
+const NIGHT_KEY = 'tb-night-mode'
 
 // BroadcastChannel for cross-tab (ambulance ↔ hospital) sync
 let channel: BroadcastChannel | null = null
@@ -216,6 +207,22 @@ export const useRunStore = create<RunStore>((set, get) => ({
       return { activeRun: run }
     }),
 
+  updateRunMeta: (patch) =>
+    set((s) => {
+      if (!s.activeRun) return s
+      const run: EmergencyRun = { ...s.activeRun, ...patch, updatedAt: now() }
+      broadcastUpdate(run)
+      return { activeRun: run }
+    }),
+
+  setCrewNotes: (text) =>
+    set((s) => {
+      if (!s.activeRun) return s
+      const run: EmergencyRun = { ...s.activeRun, crewNotes: text, updatedAt: now() }
+      broadcastUpdate(run)
+      return { activeRun: run }
+    }),
+
   // ── Patient ───────────────────────────────────────────────────────────────
 
   updatePatient: (patch) =>
@@ -225,10 +232,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
         ...s.activeRun,
         patient: { ...s.activeRun.patient, ...patch },
         updatedAt: now(),
-        events: [
-          ...s.activeRun.events,
-          makeEvent('patient-updated', 'Patient details updated'),
-        ],
+        events: pushEvent(s.activeRun.events, makeEvent('patient-updated', 'Patient details updated')),
       }
       broadcastUpdate(run)
       return { activeRun: run }
@@ -259,14 +263,30 @@ export const useRunStore = create<RunStore>((set, get) => ({
   updateIncident: (patch) =>
     set((s) => {
       if (!s.activeRun) return s
+      const incident = { ...s.activeRun.incident, ...patch }
       const run: EmergencyRun = {
         ...s.activeRun,
-        incident: { ...s.activeRun.incident, ...patch },
+        incident,
         updatedAt: now(),
-        events: [
-          ...s.activeRun.events,
-          makeEvent('incident-recorded', `Incident: ${patch.mechanism ?? patch.mechanismCode ?? 'updated'}`),
-        ],
+        events: pushEvent(
+          s.activeRun.events,
+          makeEvent('incident-recorded', `Incident: ${incident.mechanism ?? incident.mechanismCode ?? 'updated'}`)
+        ),
+      }
+      broadcastUpdate(run)
+      return { activeRun: run }
+    }),
+
+  // ── Primary survey (ABCDE) ────────────────────────────────────────────────
+
+  updatePrimarySurvey: (patch) =>
+    set((s) => {
+      if (!s.activeRun) return s
+      const run: EmergencyRun = {
+        ...s.activeRun,
+        primarySurvey: { ...s.activeRun.primarySurvey, ...patch, updatedAt: now() },
+        updatedAt: now(),
+        events: pushEvent(s.activeRun.events, makeEvent('note', 'Primary survey (ABCDE) updated')),
       }
       broadcastUpdate(run)
       return { activeRun: run }
@@ -376,6 +396,18 @@ export const useRunStore = create<RunStore>((set, get) => ({
       return { activeRun: run }
     }),
 
+  updateTreatment: (id, patch) =>
+    set((s) => {
+      if (!s.activeRun) return s
+      const run: EmergencyRun = {
+        ...s.activeRun,
+        treatments: s.activeRun.treatments.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+        updatedAt: now(),
+      }
+      broadcastUpdate(run)
+      return { activeRun: run }
+    }),
+
   removeTreatment: (id) =>
     set((s) => {
       if (!s.activeRun) return s
@@ -394,11 +426,19 @@ export const useRunStore = create<RunStore>((set, get) => ({
     set((s) => {
       if (!s.activeRun) return s
       const run = s.activeRun
+      const built = buildMist(run)
+      const fields = {
+        mechanism: built.mechanism,
+        injuries: built.injuries,
+        signs: built.signs,
+        treatment: built.treatment,
+      }
       const mist: MISTSummary = {
-        mechanism: generateMechanismText(run),
-        injuries: generateInjuryText(run.injuries),
-        signs: generateSignsText(run.vitalObservations),
-        treatment: generateTreatmentText(run.treatments),
+        ...fields,
+        original: fields,
+        shockIndex: built.shockIndex,
+        rts: built.rts,
+        trts: built.trts,
         generatedAt: now(),
         isEdited: false,
       }
@@ -406,7 +446,7 @@ export const useRunStore = create<RunStore>((set, get) => ({
         ...run,
         mist,
         updatedAt: now(),
-        events: [...run.events, makeEvent('mist-generated', 'MIST summary generated')],
+        events: pushEvent(run.events, makeEvent('mist-generated', 'MIST summary generated')),
       }
       broadcastUpdate(updated)
       return { activeRun: updated }
@@ -415,11 +455,16 @@ export const useRunStore = create<RunStore>((set, get) => ({
   updateMIST: (patch) =>
     set((s) => {
       if (!s.activeRun?.mist) return s
-      const run: EmergencyRun = {
-        ...s.activeRun,
-        mist: { ...s.activeRun.mist, ...patch, isEdited: true },
-        updatedAt: now(),
-      }
+      const merged = { ...s.activeRun.mist, ...patch }
+      const o = merged.original
+      // Edited = any block differs from the auto-generated snapshot
+      merged.isEdited = o
+        ? merged.mechanism !== o.mechanism ||
+          merged.injuries !== o.injuries ||
+          merged.signs !== o.signs ||
+          merged.treatment !== o.treatment
+        : true
+      const run: EmergencyRun = { ...s.activeRun, mist: merged, updatedAt: now() }
       broadcastUpdate(run)
       return { activeRun: run }
     }),
@@ -459,6 +504,34 @@ export const useRunStore = create<RunStore>((set, get) => ({
       broadcastUpdate(run)
       return { activeRun: run }
     }),
+
+  transmitPreAlert: (opts) => {
+    const first = get().activeRun
+    if (!first) return
+    // Always transmit a MIST that reflects the latest data unless the crew edited it
+    if (!first.mist || !first.mist.isEdited) get().generateMIST()
+    get().confirmMIST(first.crewLead)
+
+    const r = get().activeRun!
+    if (r.bloodBankRequired === 'yes' && !r.bloodBankRequest) {
+      const v = latestVitals(r.vitalObservations)
+      const si = shockIndex(v.hr, v.sbp)
+      const hospital = AVAILABLE_HOSPITALS.find((h) => h.id === r.destinationHospitalId)
+      get().createBloodRequest({
+        requestedBy: r.crewLead,
+        bloodGroup: 'Unknown',
+        rhFactor: 'unknown',
+        productType: 'o-negative',
+        unitsRequested: opts?.bloodUnits ?? 4,
+        clinicalJustification: si !== null
+          ? `Suspected haemorrhage. Shock Index ${si.toFixed(2)}${v.sbp ? `, SBP ${v.sbp} mmHg` : ''}. Crossmatch not available.`
+          : 'Crew anticipate blood products on arrival. Crossmatch not available.',
+        recipient: hospital?.name ?? 'MTC Blood Bank',
+      })
+    }
+    get().setRunStatus('transporting')
+    get().sendPreAlert()
+  },
 
   acknowledgeAlert: (acknowledgedBy) =>
     set((s) => {
@@ -584,7 +657,22 @@ export const useRunStore = create<RunStore>((set, get) => ({
 
   // ── UI ────────────────────────────────────────────────────────────────────
 
-  setNightMode: (v) => set({ nightMode: v }),
+  setNightMode: (v) => {
+    set({ nightMode: v })
+    try {
+      localStorage.setItem(NIGHT_KEY, v ? '1' : '0')
+    } catch {
+      /* storage unavailable — preference just won't persist */
+    }
+  },
+  hydrateNightMode: () => {
+    try {
+      const saved = localStorage.getItem(NIGHT_KEY)
+      if (saved !== null) set({ nightMode: saved === '1' })
+    } catch {
+      /* ignore */
+    }
+  },
   toggleVoiceSim: () => set((s) => ({ voiceSimActive: !s.voiceSimActive })),
 }))
 
@@ -594,18 +682,23 @@ function broadcastUpdate(run: EmergencyRun) {
   getChannel()?.postMessage({ type: 'update', run })
 }
 
-/** Call this once in a client component to subscribe to cross-tab updates */
-export function initRunSync() {
-  if (typeof window === 'undefined') return
+/**
+ * Subscribe to cross-tab updates. Returns a cleanup function so React
+ * Strict-Mode double mounts / unmounts never leave a stale listener behind.
+ */
+export function initRunSync(): () => void {
+  if (typeof window === 'undefined') return () => {}
   const ch = getChannel()
-  if (!ch) return
-  ch.onmessage = (ev) => {
+  if (!ch) return () => {}
+  const handler = (ev: MessageEvent) => {
     if (ev.data?.type === 'update') {
       useRunStore.setState({ activeRun: ev.data.run })
     } else if (ev.data?.type === 'clear') {
       useRunStore.setState({ activeRun: null })
     }
   }
+  ch.addEventListener('message', handler)
+  return () => ch.removeEventListener('message', handler)
 }
 
 // ─── Default hospital prep items ─────────────────────────────────────────────

@@ -334,11 +334,11 @@ export function DemoBanner() {
 const WIZARD_STEPS = [
   { id: 'patient', label: 'Patient', short: 'Pt' },
   { id: 'incident', label: 'Incident', short: 'Scene' },
+  { id: 'survey', label: 'Survey', short: 'ABCDE' },
   { id: 'injuries', label: 'Injuries', short: 'Injuries' },
   { id: 'vitals', label: 'Vitals', short: 'Vitals' },
-  { id: 'treatments', label: 'Treatment', short: 'Tx' },
-  { id: 'mist', label: 'MIST', short: 'MIST' },
-  { id: 'review', label: 'Review & Send', short: 'Review' },
+  { id: 'treatments', label: 'Interventions', short: 'Tx' },
+  { id: 'review', label: 'MIST & Alert', short: 'Send' },
 ] as const
 
 type StepId = typeof WIZARD_STEPS[number]['id']
@@ -351,8 +351,8 @@ interface WizardProgressProps {
 }
 
 export function WizardProgress({ currentStep, completedSteps, onStepClick, nightMode }: WizardProgressProps) {
-  // Normalize review / handover
-  const activeNormalized = currentStep === 'handover' ? 'review' : currentStep
+  // Normalize legacy step ids (merged into the final step)
+  const activeNormalized = currentStep === 'handover' || currentStep === 'mist' ? 'review' : currentStep
   const currentIndex = Math.max(0, WIZARD_STEPS.findIndex((s) => s.id === activeNormalized))
   const progressPercent = Math.round(((currentIndex + 1) / WIZARD_STEPS.length) * 100)
 
@@ -361,30 +361,30 @@ export function WizardProgress({ currentStep, completedSteps, onStepClick, night
       {/* Step Pills Row */}
       <div className="flex items-center justify-between gap-1 sm:gap-2">
         {WIZARD_STEPS.map((step, i) => {
-          const isCompleted = completedSteps.includes(step.id) || (step.id === 'review' && completedSteps.includes('handover'))
+          const isCompleted = completedSteps.includes(step.id)
           const isCurrent = activeNormalized === step.id
-          const isClickable = (isCompleted || isCurrent) && onStepClick
+          // Every step is reachable: missing information must never block emergency transport
+          const isClickable = !!onStepClick
 
           return (
             <button
               key={step.id}
               type="button"
-              onClick={() => isClickable && onStepClick(step.id)}
-              disabled={!isClickable}
+              onClick={() => onStepClick?.(step.id)}
               title={`${i + 1}. ${step.label}`}
               className={cn(
-                'flex items-center gap-1.5 px-2 py-1 rounded-xl text-xs font-semibold transition-all duration-150 select-none flex-1 justify-center min-w-0',
+                'flex items-center gap-1.5 px-2 min-h-[36px] rounded-xl text-xs font-semibold transition-all duration-150 select-none flex-1 justify-center min-w-0 cursor-pointer',
                 isCurrent
                   ? nightMode
                     ? 'bg-sky-500 text-white shadow-md shadow-sky-500/25 ring-1 ring-sky-400'
                     : 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
                   : isCompleted
                   ? nightMode
-                    ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 cursor-pointer'
-                    : 'text-emerald-700 bg-emerald-50 border border-emerald-200/80 hover:bg-emerald-100/70 cursor-pointer'
+                    ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20'
+                    : 'text-emerald-700 bg-emerald-50 border border-emerald-200/80 hover:bg-emerald-100/70'
                   : nightMode
-                  ? 'text-slate-500 bg-[#14233C]/60 border border-[#1E3559]/40 cursor-default'
-                  : 'text-slate-400 bg-slate-100/80 border border-slate-200/60 cursor-default'
+                  ? 'text-slate-300 bg-[#14233C] border border-[#1E3559] hover:bg-[#1B2F50]'
+                  : 'text-slate-600 bg-white border border-slate-200 hover:bg-slate-50'
               )}
             >
               <span

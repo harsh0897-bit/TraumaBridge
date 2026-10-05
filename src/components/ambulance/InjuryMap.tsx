@@ -5,11 +5,11 @@ import { motion, AnimatePresence } from 'motion/react'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
 import {
-  X, Info, Camera, Upload, Check, AlertTriangle, Trash2, Eye, Plus,
-  RotateCw, Layers, ShieldCheck, ChevronRight
+  X, Camera, Upload, Trash2, RotateCw, Layers, Zap, Check, Plus
 } from 'lucide-react'
-import { Button, Input, Textarea, Badge } from '@/components/ui'
+import { Button, Badge } from '@/components/ui'
 import type { InjuryRecord, InjuryClassification } from '@/types/run'
+import { useVoiceTarget } from '@/lib/voice'
 
 export type BodyView = 'front' | 'back' | 'side'
 
@@ -20,14 +20,13 @@ interface RegionDef {
   frontPath?: string
   backPath?: string
   sidePath?: string
-  frontCenter?: [number, number] // Percentage coordinates [x, y]
+  frontCenter?: [number, number]
   backCenter?: [number, number]
   sideCenter?: [number, number]
   hasLaterality: boolean
 }
 
 // ─── Calibrated Anatomical Regions (500x900 viewBox) ─────────────────────────
-// Matched to the generated photorealistic medical human figure set
 const REGIONS: RegionDef[] = [
   // HEAD & NECK
   {
@@ -385,6 +384,8 @@ export function InjuryMap({ injuries, onAdd, onRemove, nightMode }: InjuryMapPro
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null)
   const [hoveredRegionId, setHoveredRegionId] = useState<string | null>(null)
   const [showAllLabels, setShowAllLabels] = useState(false)
+  const [quickMode, setQuickMode] = useState(false)
+  const [lastQuickAdded, setLastQuickAdded] = useState<string | null>(null)
 
   // Current injury in form
   const [selectedFinding, setSelectedFinding] = useState<string>('Pain / Tenderness')
@@ -392,11 +393,31 @@ export function InjuryMap({ injuries, onAdd, onRemove, nightMode }: InjuryMapPro
   const [crewNotes, setCrewNotes] = useState<string>('')
   const [attachedPhoto, setAttachedPhoto] = useState<string | null>(null)
 
+  // Register voice target for injury notes
+  useVoiceTarget(
+    selectedRegionId
+      ? {
+          label: 'Injury Notes',
+          hint: 'e.g. Tenderness on palpation, seatbelt sign, no crepitus',
+          sample: 'Deep laceration right forearm with venous bleeding',
+          apply: (t: string) => {
+            setCrewNotes((prev) => (prev ? `${prev} ${t}` : t))
+            return 'Logged injury notes'
+          },
+        }
+      : null
+  )
+
   const activeRegions = REGIONS.filter((r) => {
     if (view === 'front') return !!r.frontPath
     if (view === 'back') return !!r.backPath
     return !!r.sidePath
   })
+
+  // Regional counts by view perspective
+  const frontCount = injuries.filter((i) => REGIONS.some((r) => r.id === i.region && !!r.frontPath)).length
+  const backCount  = injuries.filter((i) => REGIONS.some((r) => r.id === i.region && !!r.backPath)).length
+  const sideCount  = injuries.filter((i) => REGIONS.some((r) => r.id === i.region && !!r.sidePath)).length
 
   const injuriesOnRegion = (regionId: string) =>
     injuries.filter((i) => i.region === regionId)
@@ -405,6 +426,25 @@ export function InjuryMap({ injuries, onAdd, onRemove, nightMode }: InjuryMapPro
   const hoveredRegion = REGIONS.find((r) => r.id === hoveredRegionId)
 
   const handleSelectRegion = (regionId: string) => {
+    const reg = REGIONS.find((r) => r.id === regionId)
+    if (quickMode) {
+      // In Quick Mode: instant-log moderate pain/tenderness
+      const newInjury: InjuryRecord = {
+        id: Math.random().toString(36).slice(2, 10),
+        region: regionId,
+        laterality: regionId.includes('right') ? 'right' : regionId.includes('left') ? 'left' : 'na',
+        type: 'blunt',
+        specificFinding: 'Pain / Tenderness',
+        severity: 'moderate',
+        timestamp: new Date().toISOString(),
+        assessedBy: 'Paramedic (Quick Mark)',
+      }
+      onAdd(newInjury)
+      setLastQuickAdded(reg?.label ?? regionId)
+      setTimeout(() => setLastQuickAdded(null), 2500)
+      return
+    }
+
     setSelectedRegionId(regionId)
     setSelectedFinding('Pain / Tenderness')
     setSelectedSeverity('moderate')
@@ -443,7 +483,6 @@ export function InjuryMap({ injuries, onAdd, onRemove, nightMode }: InjuryMapPro
     setCrewNotes('')
   }
 
-  // Determine current image asset based on view (matched multi-view asset set)
   const figureSrc =
     view === 'front'
       ? '/images/body-front.jpg'
@@ -451,67 +490,342 @@ export function InjuryMap({ injuries, onAdd, onRemove, nightMode }: InjuryMapPro
       ? '/images/body-back.jpg'
       : '/images/body-side.jpg'
 
+  // Render detail form
+  const renderDetailForm = () => {
+    if (!selectedRegion) return null
+
+    return (
+      <div className={cn(
+        'p-5 sm:p-6 rounded-3xl border-2 shadow-xl space-y-5',
+        nightMode
+          ? 'bg-slate-900 border-sky-500/80 text-white'
+          : 'bg-white border-sky-500 text-slate-900'
+      )}>
+        <div className="flex items-center justify-between pb-3 border-b border-slate-200/50">
+          <div>
+            <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-sky-500 block">
+              Selected Anatomical Region
+            </span>
+            <h3 className="text-base sm:text-lg font-extrabold">
+              {selectedRegion.label}
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSelectedRegionId(null)}
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Clinical Findings Grid */}
+        <div>
+          <label className="font-bold text-xs block mb-2 opacity-90">
+            What do you see / palpate here?
+          </label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-52 overflow-y-auto pr-1">
+            {CLINICAL_FINDINGS.map((finding) => (
+              <button
+                key={finding}
+                type="button"
+                onClick={() => setSelectedFinding(finding)}
+                className={cn(
+                  'px-3 py-2.5 rounded-xl text-xs font-semibold text-left border transition-all min-h-[44px]',
+                  selectedFinding === finding
+                    ? 'bg-sky-500 text-white border-sky-500 shadow-md'
+                    : nightMode
+                    ? 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-750'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                )}
+              >
+                {finding}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Severity Levels */}
+        <div>
+          <label className="font-bold text-xs block mb-2 opacity-90">
+            Severity Assessment
+          </label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+            {SEVERITY_LEVELS.map((lvl) => (
+              <button
+                key={lvl.key}
+                type="button"
+                onClick={() => setSelectedSeverity(lvl.key)}
+                className={cn(
+                  'p-2.5 rounded-xl border text-left transition-all min-h-[56px]',
+                  selectedSeverity === lvl.key
+                    ? 'border-sky-500 bg-sky-500/15 ring-2 ring-sky-500'
+                    : nightMode
+                    ? 'border-slate-800 bg-slate-800/80 hover:bg-slate-800'
+                    : 'border-slate-200 bg-white hover:bg-slate-50'
+                )}
+              >
+                <span className="font-bold text-xs block">{lvl.label}</span>
+                <span className="text-[10px] text-slate-400 block leading-tight mt-0.5">{lvl.desc}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Crew Notes */}
+        <div>
+          <label className="font-bold text-xs block mb-1 opacity-90">
+            Crew Notes (Tap mic below or type)
+          </label>
+          <input
+            type="text"
+            placeholder="e.g. Tenderness on palpation, seatbelt sign, no crepitus"
+            value={crewNotes}
+            onChange={(e) => setCrewNotes(e.target.value)}
+            className={cn(
+              'w-full px-3.5 py-3 text-xs rounded-xl border focus:outline-none focus:ring-2 focus:ring-sky-500',
+              nightMode
+                ? 'bg-slate-800 border-slate-700 text-white placeholder-slate-500'
+                : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
+            )}
+          />
+        </div>
+
+        {/* Photo Evidence */}
+        <div className="pt-2 border-t border-slate-200/50">
+          <span className="font-bold text-xs block mb-1.5 opacity-90">
+            Photo Evidence (Optional)
+          </span>
+          {attachedPhoto ? (
+            <div className="flex items-center gap-3 p-3 rounded-2xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800">
+              <div className="w-14 h-14 relative rounded-xl overflow-hidden flex-shrink-0 bg-slate-200 border">
+                <Image src={attachedPhoto} alt="Injury" fill className="object-cover" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="text-xs font-bold block truncate">
+                  Photo Captured by Ambulance Staff
+                </span>
+                <span className="text-[11px] text-slate-400 block font-mono mt-0.5">
+                  Attached to {selectedRegion.label}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAttachedPhoto(null)}
+                className="text-slate-400 hover:text-red-500 p-2 rounded-lg"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                icon={<Camera className="w-3.5 h-3.5 text-sky-600" />}
+                onClick={() => setAttachedPhoto('/images/hero-handover.jpg')}
+              >
+                Take Photo
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                icon={<Upload className="w-3.5 h-3.5 text-slate-500" />}
+                onClick={() => setAttachedPhoto('/images/hero-handover.jpg')}
+              >
+                Upload Photo
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-3 pt-2">
+          <Button
+            type="button"
+            variant="primary"
+            size="md"
+            onClick={handleSaveInjury}
+            className="flex-1 bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 rounded-2xl text-sm"
+          >
+            ✓ Save Injury to {selectedRegion.label}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="md"
+            onClick={() => setSelectedRegionId(null)}
+          >
+            Cancel
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col lg:flex-row items-start gap-6 w-full">
       {/* ── LEFT: Interactive Anatomical Viewer ───────────────────────────── */}
-      <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 p-5 rounded-3xl bg-white border border-slate-200/90 shadow-sm flex-shrink-0 w-full lg:w-auto">
-        {/* Left View Switcher (Large tactile targets) */}
-        <div className="flex sm:flex-col gap-2 w-full sm:w-32 flex-shrink-0">
+      <div className={cn(
+        'flex flex-col sm:flex-row items-center sm:items-start gap-4 p-5 rounded-3xl border shadow-sm flex-shrink-0 w-full lg:w-auto',
+        nightMode
+          ? 'bg-slate-900/90 border-slate-800'
+          : 'bg-white border-slate-200/90'
+      )}>
+        {/* Left View Switcher */}
+        <div className="flex sm:flex-col gap-2 w-full sm:w-36 flex-shrink-0">
           <div className="flex items-center justify-between sm:mb-1">
             <span className="font-mono text-[10px] uppercase font-bold tracking-wider text-slate-400">
               Perspective
             </span>
           </div>
 
-          {(['front', 'back', 'side'] as BodyView[]).map((v) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => {
-                setView(v)
-                setSelectedRegionId(null)
-              }}
-              className={cn(
-                'flex-1 sm:flex-none px-3.5 py-3 rounded-2xl font-bold text-xs tracking-wide transition-all duration-200 border text-center flex items-center justify-center gap-2',
-                view === v
-                  ? 'bg-sky-500 text-white border-sky-500 shadow-md shadow-sky-500/20'
-                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900'
-              )}
-            >
-              <RotateCw className={cn('w-3.5 h-3.5', view === v ? 'text-white' : 'text-slate-400')} />
-              <span>{v === 'front' ? 'Anterior' : v === 'back' ? 'Posterior' : 'Lateral'}</span>
-            </button>
-          ))}
+          {/* Anterior */}
+          <button
+            type="button"
+            onClick={() => {
+              setView('front')
+              setSelectedRegionId(null)
+            }}
+            className={cn(
+              'flex-1 sm:flex-none px-3 py-3 rounded-2xl font-bold text-xs tracking-wide transition-all border flex items-center justify-between gap-1.5 min-h-[48px]',
+              view === 'front'
+                ? 'bg-sky-500 text-white border-sky-500 shadow-md shadow-sky-500/20'
+                : nightMode
+                ? 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900'
+            )}
+          >
+            <div className="flex items-center gap-1.5">
+              <RotateCw className="w-3.5 h-3.5" />
+              <span>Anterior</span>
+            </div>
+            {frontCount > 0 && (
+              <span className={cn(
+                'px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold',
+                view === 'front' ? 'bg-white/20 text-white' : 'bg-sky-100 text-sky-800'
+              )}>
+                {frontCount}
+              </span>
+            )}
+          </button>
 
-          {/* Toggle All Zones button */}
+          {/* Posterior */}
+          <button
+            type="button"
+            onClick={() => {
+              setView('back')
+              setSelectedRegionId(null)
+            }}
+            className={cn(
+              'flex-1 sm:flex-none px-3 py-3 rounded-2xl font-bold text-xs tracking-wide transition-all border flex items-center justify-between gap-1.5 min-h-[48px]',
+              view === 'back'
+                ? 'bg-sky-500 text-white border-sky-500 shadow-md shadow-sky-500/20'
+                : nightMode
+                ? 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900'
+            )}
+          >
+            <div className="flex items-center gap-1.5">
+              <RotateCw className="w-3.5 h-3.5" />
+              <span>Posterior</span>
+            </div>
+            {backCount > 0 && (
+              <span className={cn(
+                'px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold',
+                view === 'back' ? 'bg-white/20 text-white' : 'bg-sky-100 text-sky-800'
+              )}>
+                {backCount}
+              </span>
+            )}
+          </button>
+
+          {/* Lateral */}
+          <button
+            type="button"
+            onClick={() => {
+              setView('side')
+              setSelectedRegionId(null)
+            }}
+            className={cn(
+              'flex-1 sm:flex-none px-3 py-3 rounded-2xl font-bold text-xs tracking-wide transition-all border flex items-center justify-between gap-1.5 min-h-[48px]',
+              view === 'side'
+                ? 'bg-sky-500 text-white border-sky-500 shadow-md shadow-sky-500/20'
+                : nightMode
+                ? 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900'
+            )}
+          >
+            <div className="flex items-center gap-1.5">
+              <RotateCw className="w-3.5 h-3.5" />
+              <span>Lateral</span>
+            </div>
+            {sideCount > 0 && (
+              <span className={cn(
+                'px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold',
+                view === 'side' ? 'bg-white/20 text-white' : 'bg-sky-100 text-sky-800'
+              )}>
+                {sideCount}
+              </span>
+            )}
+          </button>
+
+          {/* Quick Mark Mode Toggle */}
+          <button
+            type="button"
+            onClick={() => setQuickMode(!quickMode)}
+            className={cn(
+              'mt-2 px-3 py-2.5 rounded-xl text-xs font-bold border flex items-center justify-center gap-1.5 transition-colors min-h-[44px]',
+              quickMode
+                ? 'bg-amber-500 text-white border-amber-600 shadow-md animate-pulse'
+                : nightMode
+                ? 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+            )}
+            title="When active, 1-tap marks moderate injury immediately"
+          >
+            <Zap className="w-3.5 h-3.5 fill-current" />
+            <span>{quickMode ? '⚡ Quick Mark ON' : '⚡ Quick Mark'}</span>
+          </button>
+
+          {/* Toggle Labels */}
           <button
             type="button"
             onClick={() => setShowAllLabels(!showAllLabels)}
             className={cn(
-              'mt-2 px-3 py-2 rounded-xl text-[11px] font-semibold border flex items-center justify-center gap-1.5 transition-colors',
+              'px-3 py-2 rounded-xl text-[11px] font-semibold border flex items-center justify-center gap-1.5 transition-colors',
               showAllLabels
-                ? 'bg-sky-50 text-sky-700 border-sky-300'
-                : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+                ? 'bg-sky-500/20 text-sky-500 border-sky-400'
+                : nightMode
+                ? 'bg-slate-800 text-slate-400 border-slate-700'
+                : 'bg-slate-50 text-slate-500 border-slate-200'
             )}
           >
             <Layers className="w-3.5 h-3.5" />
             <span>{showAllLabels ? 'Hide Labels' : 'Show Labels'}</span>
           </button>
 
-          {/* Guidance note */}
-          <div className="mt-2 hidden sm:block p-3 rounded-2xl bg-sky-50/70 border border-sky-100 text-[11px] text-sky-900 leading-snug">
-            <span className="font-bold block text-sky-950 mb-0.5">Tactile Inspection</span>
-            Tap any anatomical zone to record clinical findings.
-          </div>
+          {/* Notification on Quick Add */}
+          {lastQuickAdded && (
+            <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 text-center text-xs font-bold animate-bounce">
+              ✓ Logged {lastQuickAdded}
+            </div>
+          )}
         </div>
 
         {/* Anatomical Figure Canvas */}
         <div className="relative flex flex-col items-center">
           <div
-            className="relative rounded-2xl overflow-hidden bg-gradient-to-b from-[#F9FBFC] to-[#EEF3F7] border border-slate-200 shadow-inner"
+            className={cn(
+              'relative rounded-2xl overflow-hidden border shadow-inner',
+              nightMode
+                ? 'bg-slate-950 border-slate-800'
+                : 'bg-gradient-to-b from-[#F9FBFC] to-[#EEF3F7] border-slate-200'
+            )}
             style={{ width: 320, height: 576 }}
           >
-            {/* Matched Photorealistic Medical Illustration with Motion Transition */}
             <AnimatePresence mode="wait">
               <motion.div
                 key={view}
@@ -623,7 +937,7 @@ export function InjuryMap({ injuries, onAdd, onRemove, nightMode }: InjuryMapPro
               })}
             </svg>
 
-            {/* Clean Floating Leader Pill for Hovered / Selected Zone (Never overlapping wall of text) */}
+            {/* Leader Pill for Hovered / Selected Zone */}
             <AnimatePresence>
               {(hoveredRegion || selectedRegion) && (
                 <motion.div
@@ -632,13 +946,13 @@ export function InjuryMap({ injuries, onAdd, onRemove, nightMode }: InjuryMapPro
                   exit={{ opacity: 0 }}
                   className="absolute bottom-3 left-3 right-3 z-20 pointer-events-none"
                 >
-                  <div className="bg-slate-900/90 text-white backdrop-blur px-3 py-1.5 rounded-xl text-xs font-semibold shadow-lg border border-slate-700/60 flex items-center justify-between">
+                  <div className="bg-slate-900/90 text-white backdrop-blur px-3 py-2 rounded-xl text-xs font-semibold shadow-lg border border-slate-700/60 flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
                       {selectedRegion?.label ?? hoveredRegion?.label}
                     </span>
                     <span className="text-[10px] font-mono text-slate-300 uppercase">
-                      {selectedRegionId ? 'Selected' : 'Tap to document'}
+                      {quickMode ? '1-Tap to Log' : selectedRegionId ? 'Selected' : 'Tap to document'}
                     </span>
                   </div>
                 </motion.div>
@@ -664,265 +978,145 @@ export function InjuryMap({ injuries, onAdd, onRemove, nightMode }: InjuryMapPro
         </div>
       </div>
 
-      {/* ── RIGHT: Contextual Detail Panel & Recorded Injuries ───────────── */}
+      {/* ── RIGHT (Desktop) / BOTTOM SHEET (Mobile) ────────────────────────── */}
       <div className="flex-1 flex flex-col gap-4 min-w-0 w-full">
-        <AnimatePresence mode="wait">
-          {selectedRegionId && selectedRegion ? (
-            /* Contextual Detail Form */
-            <motion.div
-              key="injury-form"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="p-6 rounded-3xl bg-white border-2 border-sky-500 shadow-lg shadow-sky-500/5 space-y-5"
-            >
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div>
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-sky-600 block">
-                    Selected Anatomical Region
-                  </span>
-                  <h3 className="text-lg font-extrabold text-slate-900">
-                    {selectedRegion.label}
-                  </h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedRegionId(null)}
-                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+        {/* Desktop inline editor */}
+        <div className="hidden lg:block">
+          <AnimatePresence mode="wait">
+            {selectedRegionId && selectedRegion ? (
+              <motion.div
+                key="desktop-editor"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+              >
+                {renderDetailForm()}
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+        </div>
 
-              {/* Question 1: What do you see here? */}
-              <div>
-                <label className="font-bold text-xs text-slate-800 block mb-2">
-                  What do you see here?
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-48 overflow-y-auto pr-1">
-                  {CLINICAL_FINDINGS.map((finding) => (
-                    <button
-                      key={finding}
-                      type="button"
-                      onClick={() => setSelectedFinding(finding)}
-                      className={cn(
-                        'px-3 py-2.5 rounded-xl text-xs font-semibold text-left border transition-all',
-                        selectedFinding === finding
-                          ? 'bg-sky-500 text-white border-sky-500 shadow-sm'
-                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+        {/* Mobile / Tablet slide-up modal bottom sheet */}
+        <AnimatePresence>
+          {selectedRegionId && selectedRegion && (
+            <div className="lg:hidden fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
+              <motion.div
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+                className="w-full max-w-xl max-h-[88vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl shadow-2xl"
+              >
+                {renderDetailForm()}
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Recorded Injuries List */}
+        <div className={cn(
+          'p-5 sm:p-6 rounded-3xl border shadow-sm space-y-4 w-full',
+          nightMode
+            ? 'bg-slate-900/90 border-slate-800 text-white'
+            : 'bg-white border-slate-200/90 text-slate-900'
+        )}>
+          <div className="flex items-center justify-between pb-2 border-b border-slate-200/50">
+            <div>
+              <h3 className="font-bold text-sm">
+                Recorded Injuries ({injuries.length})
+              </h3>
+              <p className="text-xs text-slate-400">
+                {quickMode
+                  ? '⚡ Quick Mark Active — Tap any anatomical zone to log moderate injury instantly.'
+                  : 'Tap any anatomical zone on the figure to document trauma details.'}
+              </p>
+            </div>
+            {injuries.length > 0 && (
+              <Badge variant="sky" size="sm">
+                {injuries.length} {injuries.length === 1 ? 'region' : 'regions'}
+              </Badge>
+            )}
+          </div>
+
+          {injuries.length === 0 ? (
+            <div className="py-10 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+              <p className="text-xs text-slate-400 font-medium max-w-xs mx-auto">
+                No injuries recorded yet. Tap any body region on the figure to mark trauma findings.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
+              {injuries.map((inj) => {
+                const regDef = REGIONS.find((r) => r.id === inj.region)
+                const label = regDef ? regDef.label : inj.region
+
+                return (
+                  <div
+                    key={inj.id}
+                    className={cn(
+                      'p-4 rounded-2xl border flex items-start justify-between gap-3 transition-colors',
+                      nightMode
+                        ? 'bg-slate-800/70 border-slate-700/80 hover:bg-slate-800'
+                        : 'bg-slate-50/70 border-slate-200 hover:bg-slate-50'
+                    )}
+                  >
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-xs">
+                          {label}
+                        </span>
+                        <span
+                          className={cn(
+                            'px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider',
+                            inj.severity === 'critical'
+                              ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                              : inj.severity === 'severe'
+                              ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                              : inj.severity === 'moderate'
+                              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                              : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          )}
+                        >
+                          {inj.severity}
+                        </span>
+                      </div>
+
+                      <p className="text-xs font-medium opacity-90">
+                        {inj.specificFinding ?? `${inj.type} trauma`}
+                      </p>
+
+                      {inj.notes && (
+                        <p className="text-xs text-slate-400 italic">
+                          &ldquo;{inj.notes}&rdquo;
+                        </p>
                       )}
-                    >
-                      {finding}
-                    </button>
-                  ))}
-                </div>
-              </div>
 
-              {/* Question 2: How serious does it appear? */}
-              <div>
-                <label className="font-bold text-xs text-slate-800 block mb-2">
-                  How serious does it appear?
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                  {SEVERITY_LEVELS.map((lvl) => (
-                    <button
-                      key={lvl.key}
-                      type="button"
-                      onClick={() => setSelectedSeverity(lvl.key)}
-                      className={cn(
-                        'p-2.5 rounded-xl border text-left transition-all',
-                        selectedSeverity === lvl.key
-                          ? 'border-sky-500 bg-sky-50/80 shadow-sm ring-1 ring-sky-500'
-                          : 'border-slate-200 bg-white hover:bg-slate-50'
+                      {inj.photoUrl && (
+                        <div className="flex items-center gap-2 pt-1">
+                          <div className="w-8 h-8 relative rounded-lg overflow-hidden border border-slate-200 bg-slate-100 flex-shrink-0">
+                            <Image src={inj.photoUrl} alt="Evidence" fill className="object-cover" />
+                          </div>
+                          <span className="text-[11px] text-sky-500 font-medium">
+                            Photo evidence attached
+                          </span>
+                        </div>
                       )}
-                    >
-                      <span className="font-bold text-xs text-slate-900 block">{lvl.label}</span>
-                      <span className="text-[10px] text-slate-500 block leading-tight mt-0.5">{lvl.desc}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Crew Notes */}
-              <div>
-                <label className="font-bold text-xs text-slate-800 block mb-1">
-                  Crew Notes (Optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Tenderness on palpation, seatbelt sign, no crepitus"
-                  value={crewNotes}
-                  onChange={(e) => setCrewNotes(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500"
-                />
-              </div>
-
-              {/* Photo Evidence Section */}
-              <div className="pt-3 border-t border-slate-100">
-                <span className="font-bold text-xs text-slate-800 block mb-1.5">
-                  Photo Evidence (Optional)
-                </span>
-                {attachedPhoto ? (
-                  <div className="flex items-center gap-3 p-3 rounded-2xl bg-sky-50 border border-sky-200">
-                    <div className="w-14 h-14 relative rounded-xl overflow-hidden flex-shrink-0 bg-slate-200 border">
-                      <Image src={attachedPhoto} alt="Injury" fill className="object-cover" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-xs font-bold text-slate-900 block truncate">
-                        Photo Captured by Ambulance Staff
-                      </span>
-                      <span className="text-[11px] text-slate-500 block font-mono mt-0.5">
-                        Attached to {selectedRegion.label}
-                      </span>
-                    </div>
+
                     <button
                       type="button"
-                      onClick={() => setAttachedPhoto(null)}
-                      className="text-slate-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50"
+                      onClick={() => onRemove(inj.id)}
+                      className="p-2 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-500/10 transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center"
+                      title="Remove injury"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      icon={<Camera className="w-3.5 h-3.5 text-sky-600" />}
-                      onClick={() => setAttachedPhoto('/images/hero-handover.jpg')}
-                    >
-                      Take Photo
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      icon={<Upload className="w-3.5 h-3.5 text-slate-500" />}
-                      onClick={() => setAttachedPhoto('/images/hero-handover.jpg')}
-                    >
-                      Upload Photo
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center gap-3 pt-2">
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="md"
-                  onClick={handleSaveInjury}
-                  className="flex-1 bg-sky-500 hover:bg-sky-600 text-white font-bold py-2.5 rounded-2xl"
-                >
-                  ✓ Save Injury
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="md"
-                  onClick={() => setSelectedRegionId(null)}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </motion.div>
-          ) : (
-            /* Recorded Injuries List */
-            <div className="p-6 rounded-3xl bg-white border border-slate-200/90 shadow-sm space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                <div>
-                  <h3 className="font-bold text-sm text-slate-900">
-                    Recorded Injuries ({injuries.length})
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Tap any anatomical zone on the human figure to document findings.
-                  </p>
-                </div>
-                {injuries.length > 0 && (
-                  <Badge variant="sky" size="sm">
-                    {injuries.length} {injuries.length === 1 ? 'region' : 'regions'} documented
-                  </Badge>
-                )}
-              </div>
-
-              {injuries.length === 0 ? (
-                <div className="py-12 text-center border-2 border-dashed border-slate-200 rounded-2xl">
-                  <p className="text-xs text-slate-400 font-medium max-w-xs mx-auto">
-                    No injuries recorded yet. Tap any body region on the left to begin documenting trauma.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
-                  {injuries.map((inj) => {
-                    const regDef = REGIONS.find((r) => r.id === inj.region)
-                    const label = regDef ? regDef.label : inj.region
-
-                    return (
-                      <div
-                        key={inj.id}
-                        className="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 flex items-start justify-between gap-3 transition-colors"
-                      >
-                        <div className="space-y-1.5 flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-xs text-slate-900">
-                              {label}
-                            </span>
-                            <span
-                              className={cn(
-                                'px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider',
-                                inj.severity === 'critical'
-                                  ? 'bg-red-100 text-red-700'
-                                  : inj.severity === 'severe'
-                                  ? 'bg-orange-100 text-orange-700'
-                                  : inj.severity === 'moderate'
-                                  ? 'bg-amber-100 text-amber-700'
-                                  : 'bg-emerald-100 text-emerald-700'
-                              )}
-                            >
-                              {inj.severity}
-                            </span>
-                          </div>
-
-                          <p className="text-xs text-slate-700 font-medium">
-                            {inj.specificFinding ?? `${inj.type} trauma`}
-                          </p>
-
-                          {inj.notes && (
-                            <p className="text-xs text-slate-500 italic">
-                              "{inj.notes}"
-                            </p>
-                          )}
-
-                          {inj.photoUrl && (
-                            <div className="flex items-center gap-2 pt-1">
-                              <div className="w-8 h-8 relative rounded-lg overflow-hidden border border-slate-200 bg-slate-100 flex-shrink-0">
-                                <Image src={inj.photoUrl} alt="Evidence" fill className="object-cover" />
-                              </div>
-                              <span className="text-[11px] text-sky-600 font-medium">
-                                Photo evidence attached
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => onRemove(inj.id)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                          title="Remove injury"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+                )
+              })}
             </div>
           )}
-        </AnimatePresence>
+        </div>
       </div>
     </div>
   )
