@@ -10,6 +10,34 @@
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, 'Cascadia Code', monospace;
 
+  /* ── Hospital Console Locked Tokens (Donezo Light System) ────── */
+  --color-well: #F8FBFF;
+  --color-tile: #FFFFFF;
+  --color-border: #E3EAF2;
+  --color-ink: #111827;
+  --color-ink-2: #475569;
+  --color-primary: #1B5FB4;
+  --color-primary-soft: #EEF5FF;
+  --color-primary-ink: #1B5FB4;
+  --color-primary-deep: #0F3F82;
+  --color-hero-to: #1B5FB4;
+  --color-success: #19A974;
+  --color-success-soft: #ECF9F3;
+  --color-success-ink: #0B7A53;
+  --color-warning: #D99000;
+  --color-warning-soft: #FFF6E4;
+  --color-warning-ink: #8A5A00;
+  --color-critical: #D92D20;
+  --color-critical-soft: #FFF1EF;
+  --color-critical-ink: #B42318;
+
+  --shadow-tile: 0 1px 2px rgba(17, 24, 39, 0.04), 0 12px 28px -16px rgba(17, 24, 39, 0.12);
+  --shadow-tile-hover: 0 4px 6px -1px rgba(17, 24, 39, 0.06), 0 18px 32px -16px rgba(17, 24, 39, 0.18);
+
+  --radius-tile: 20px;
+  --radius-inner: 12px;
+  --radius-pill: 999px;
+
   /* ── Brand Navy ─────────────────────────────────────────── */
   --color-navy-950: #0A1628;
   --color-navy-900: #0F1E35;
@@ -365,3 +393,40 @@ body {
   from { stroke-dashoffset: 200; }
   to { stroke-dashoffset: 0; }
 }
+
+/* ── Hospital Console Locked CSS Classes (Never rely on Tailwind utilities) ── */
+.tile-hero {
+  background-color: #0F3F82;
+  background-image: 
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' fill='none'%3E%3Ccircle cx='150' cy='150' r='40' stroke='white' stroke-width='2.5' stroke-opacity='0.06'/%3E%3Ccircle cx='150' cy='150' r='70' stroke='white' stroke-width='2.5' stroke-opacity='0.06'/%3E%3Ccircle cx='150' cy='150' r='100' stroke='white' stroke-width='2.5' stroke-opacity='0.06'/%3E%3Ccircle cx='150' cy='150' r='130' stroke='white' stroke-width='2.5' stroke-opacity='0.06'/%3E%3C/svg%3E"),
+    linear-gradient(135deg, #0F3F82 0%, #1B5FB4 100%);
+  background-repeat: no-repeat, no-repeat;
+  background-position: right -10px bottom -10px, center;
+  background-size: 260px 260px, cover;
+  color: #FFFFFF;
+}
+
+.pattern-stripes {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(148, 163, 184, 0.25),
+    rgba(148, 163, 184, 0.25) 6px,
+    transparent 6px,
+    transparent 12px
+  );
+}
+
+/* ── Density Scaling (Tall >= 800px vs Compact < 800px) ─────────────────── */
+@media (min-height: 800px) {
+  .density-compact-only {
+    display: none !important;
+  }
+}
+
+@media (max-height: 799px) {
+  .density-tall-only {
+    display: none !important;
+  }
+}
+
+

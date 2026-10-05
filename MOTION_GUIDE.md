@@ -1,98 +1,92 @@
-﻿# TRAUMABRIDGE AI — MOTION GUIDE
-> Centralized motion system using Motion for React (motion/react) v13+
+# TRAUMABRIDGE AI — MOTION GUIDE
+> Motion for React (`motion/react`) v13+ · Hospital Receiving Console Spec
 
-## Quick Reference
+## 1. MOTION ARCHITECTURE
 
-Import all motion values from src/lib/motion.ts — never define animation values inline.
+All motion logic, timing, and variant definitions are centralized in `src/lib/motion.ts`.
+Never define magic animation numbers, custom cubic-bezier curves, or inline durations in component files.
 
-## Package
+---
 
-`
-motion@^13 (stable as of Oct 2026)
-import { motion, AnimatePresence, useScroll, useTransform } from 'motion/react'
-`
+## 2. EXPORTED PRIMITIVES (`src/lib/motion.ts`)
 
-## Usage Patterns
+| Export | Value / Type | Purpose |
+| :--- | :--- | :--- |
+| `ease` | `[0.22, 1, 0.36, 1]` | Standard clinical cubic bezier curve |
+| `durations` | `{ fast: 0.12, base: 0.20, gentle: 0.32, countUp: 0.90 }` | Seconds scale |
+| `spring` | `{ type: "spring", stiffness: 380, damping: 32 }` | Segmented sliding indicators |
+| `tileEntrance` | `Variants` (Fade + rise 12px) | Entrance animation for primary tiles |
+| `stagger` | `Variants` (45ms children stagger) | Applied to container of tiles |
+| `tabContent` | `Variants` (Crossfade + 8px slide, 220ms) | For `AnimatePresence mode="wait"` |
+| `hoverLift` | `{ y: -2, transition: { duration: 0.18, ease } }` | Interactive tile hover lift |
+| `press` | `{ scale: 0.98, transition: { duration: 0.12, ease } }` | Button & clickable element tap |
+| `useCountUp` | `(value: number, { duration? }) => number` | Number tweening hook |
 
-### Page Entrance (section scroll trigger)
-`	sx
+---
+
+## 3. USAGE PATTERNS
+
+### A. Number Count-Up (`useCountUp`)
+```tsx
+import { useCountUp } from '@/lib/motion'
+
+export function StatNumber({ value }: { value: number }) {
+  const display = useCountUp(value)
+  return <span className="tabular-nums font-extrabold text-4xl">{display}</span>
+}
+```
+
+### B. Segmented Tabs with Sliding Indicator (`layoutId`)
+```tsx
 import { motion } from 'motion/react'
-import { slideUpIn, staggerContainer, viewportOnce } from '@/lib/motion'
+import { spring } from '@/lib/motion'
 
-<motion.div
-  initial="hidden"
-  whileInView="visible"
-  viewport={viewportOnce}
-  variants={staggerContainer}
->
-  <motion.h2 variants={slideUpIn}>Heading</motion.h2>
-  <motion.p variants={slideUpIn}>Body text</motion.p>
-</motion.div>
-`
+{isActive && (
+  <motion.div
+    layoutId="activeTabIndicator"
+    className="absolute inset-0 bg-primary-soft rounded-pill"
+    transition={spring}
+  />
+)}
+```
 
-### Tab / Panel Transitions
-`	sx
+### C. Tab Transition with `AnimatePresence`
+```tsx
 import { AnimatePresence, motion } from 'motion/react'
+import { tabContent } from '@/lib/motion'
 
 <AnimatePresence mode="wait">
-  {activeTab === 'vitals' && (
-    <motion.div
-      key="vitals"
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -4 }}
-      transition={{ duration: 0.15 }}
-    >
-      {/* content */}
-    </motion.div>
-  )}
+  <motion.div
+    key={activeTab}
+    variants={tabContent}
+    initial="hidden"
+    animate="visible"
+    exit="exit"
+  >
+    {/* Tab screen */}
+  </motion.div>
 </AnimatePresence>
-`
+```
 
-### Layout-aware (tab indicator)
-`	sx
-<motion.div layoutId="tab-indicator" className="h-0.5 bg-sky-500" />
-`
+### D. Tile Grid Entrance with Stagger
+```tsx
+import { motion } from 'motion/react'
+import { stagger, tileEntrance, hoverLift } from '@/lib/motion'
 
-### Button hover/press
-`	sx
-import { hoverScale, pressScale } from '@/lib/motion'
+<motion.div variants={stagger} initial="hidden" animate="visible" className="grid grid-cols-3 gap-5">
+  <motion.div variants={tileEntrance} whileHover={hoverLift}>
+    {/* Tile content */}
+  </motion.div>
+</motion.div>
+```
 
-<motion.button whileHover={hoverScale} whileTap={pressScale}>
-  Click me
-</motion.button>
-`
+---
 
-### Parallax scroll
-`	sx
-const { scrollYProgress } = useScroll({ target: ref })
-const y = useTransform(scrollYProgress, [0, 1], ['0%', '15%'])
-<motion.div style={{ y }} />
-`
+## 4. CLINICAL SAFETY & ACCESSIBILITY RULES
 
-## Reduced Motion
-
-Always import iewportOnce for scroll triggers.
-The global CSS prefers-reduced-motion rule ensures no transforms run.
-
-For explicit handling:
-`	sx
-const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-const variants = prefersReduced ? reducedMotionVariants : slideUpIn
-`
-
-## Surface Rules
-
-| Surface | Motion Budget |
-|---------|--------------|
-| Landing page | Full — cinematic, scroll-driven, springs |
-| Ambulance terminal | Minimal — tab switch only (150ms), no decorative |
-| Hospital dashboard | Restrained — event slide-in, tab transition |
-
-## Never Do
-
-- Animate critical vital values
-- Use entrance animations that delay data rendering
-- Add motion to warning/alert states (use CSS pulse only)
-- Compete with clinical status colors in animation
-- Install multiple animation libraries (GSAP not needed for Phase 1)
+1. **`useReducedMotion` Compliance:** All translate/slide effects collapse to opacity-only when `prefers-reduced-motion` is active. Numbers update immediately without interpolation.
+2. **Never Loop Clinical Alerts:** A critical warning alert may pulse once upon change, but never loop continuously.
+3. **Continuous Loops Allowed Only For:**
+   - Real-time telemetry connection heartbeat dot
+   - ETA countdown clock tick
+4. **Zero Layout Shift:** Modals and drawers use fixed positioning and backdrop overlays with scale/opacity entrance.

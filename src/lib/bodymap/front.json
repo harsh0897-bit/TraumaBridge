@@ -1,0 +1,846 @@
+[
+  {
+    "id": "head",
+    "label": "Head (Cranium)",
+    "side": "mid",
+    "polygon": [
+      [
+        410,
+        60
+      ],
+      [
+        486,
+        60
+      ],
+      [
+        496,
+        95
+      ],
+      [
+        490,
+        130
+      ],
+      [
+        406,
+        130
+      ],
+      [
+        400,
+        95
+      ]
+    ],
+    "anchor": [
+      448,
+      95
+    ],
+    "calloutSide": "right"
+  },
+  {
+    "id": "face",
+    "label": "Face",
+    "side": "mid",
+    "polygon": [
+      [
+        406,
+        130
+      ],
+      [
+        490,
+        130
+      ],
+      [
+        482,
+        175
+      ],
+      [
+        465,
+        195
+      ],
+      [
+        431,
+        195
+      ],
+      [
+        414,
+        175
+      ]
+    ],
+    "anchor": [
+      448,
+      160
+    ],
+    "calloutSide": "left"
+  },
+  {
+    "id": "neck",
+    "label": "Neck",
+    "side": "mid",
+    "polygon": [
+      [
+        414,
+        195
+      ],
+      [
+        465,
+        195
+      ],
+      [
+        472,
+        235
+      ],
+      [
+        424,
+        235
+      ]
+    ],
+    "anchor": [
+      448,
+      215
+    ],
+    "calloutSide": "left"
+  },
+  {
+    "id": "shoulder-r",
+    "label": "Shoulder (R)",
+    "side": "right",
+    "polygon": [
+      [
+        424,
+        235
+      ],
+      [
+        370,
+        240
+      ],
+      [
+        305,
+        275
+      ],
+      [
+        290,
+        315
+      ],
+      [
+        350,
+        315
+      ],
+      [
+        380,
+        275
+      ]
+    ],
+    "anchor": [
+      340,
+      275
+    ],
+    "calloutSide": "left"
+  },
+  {
+    "id": "shoulder-l",
+    "label": "Shoulder (L)",
+    "side": "left",
+    "polygon": [
+      [
+        472,
+        235
+      ],
+      [
+        526,
+        240
+      ],
+      [
+        591,
+        275
+      ],
+      [
+        606,
+        315
+      ],
+      [
+        546,
+        315
+      ],
+      [
+        516,
+        275
+      ]
+    ],
+    "anchor": [
+      556,
+      275
+    ],
+    "calloutSide": "right"
+  },
+  {
+    "id": "chest-r",
+    "label": "Chest (R)",
+    "side": "right",
+    "polygon": [
+      [
+        380,
+        275
+      ],
+      [
+        350,
+        315
+      ],
+      [
+        358,
+        380
+      ],
+      [
+        448,
+        380
+      ],
+      [
+        448,
+        235
+      ],
+      [
+        424,
+        235
+      ]
+    ],
+    "anchor": [
+      405,
+      320
+    ],
+    "calloutSide": "left"
+  },
+  {
+    "id": "chest-l",
+    "label": "Chest (L)",
+    "side": "left",
+    "polygon": [
+      [
+        472,
+        235
+      ],
+      [
+        448,
+        235
+      ],
+      [
+        448,
+        380
+      ],
+      [
+        538,
+        380
+      ],
+      [
+        546,
+        315
+      ],
+      [
+        516,
+        275
+      ]
+    ],
+    "anchor": [
+      491,
+      320
+    ],
+    "calloutSide": "right"
+  },
+  {
+    "id": "upper-abdomen",
+    "label": "Upper Abdomen",
+    "side": "mid",
+    "polygon": [
+      [
+        358,
+        380
+      ],
+      [
+        538,
+        380
+      ],
+      [
+        542,
+        465
+      ],
+      [
+        354,
+        465
+      ]
+    ],
+    "anchor": [
+      448,
+      420
+    ],
+    "calloutSide": "right"
+  },
+  {
+    "id": "lower-abdomen",
+    "label": "Lower Abdomen",
+    "side": "mid",
+    "polygon": [
+      [
+        354,
+        465
+      ],
+      [
+        542,
+        465
+      ],
+      [
+        546,
+        545
+      ],
+      [
+        350,
+        545
+      ]
+    ],
+    "anchor": [
+      448,
+      505
+    ],
+    "calloutSide": "left"
+  },
+  {
+    "id": "pelvis-groin",
+    "label": "Pelvis / Groin",
+    "side": "mid",
+    "polygon": [
+      [
+        375,
+        545
+      ],
+      [
+        521,
+        545
+      ],
+      [
+        528,
+        624
+      ],
+      [
+        448,
+        624
+      ],
+      [
+        368,
+        624
+      ]
+    ],
+    "anchor": [
+      448,
+      585
+    ],
+    "calloutSide": "right"
+  },
+  {
+    "id": "hip-r",
+    "label": "Hip (R)",
+    "side": "right",
+    "polygon": [
+      [
+        350,
+        545
+      ],
+      [
+        375,
+        545
+      ],
+      [
+        368,
+        624
+      ],
+      [
+        335,
+        624
+      ],
+      [
+        330,
+        570
+      ]
+    ],
+    "anchor": [
+      350,
+      585
+    ],
+    "calloutSide": "left"
+  },
+  {
+    "id": "hip-l",
+    "label": "Hip (L)",
+    "side": "left",
+    "polygon": [
+      [
+        521,
+        545
+      ],
+      [
+        546,
+        545
+      ],
+      [
+        566,
+        570
+      ],
+      [
+        561,
+        624
+      ],
+      [
+        528,
+        624
+      ]
+    ],
+    "anchor": [
+      546,
+      585
+    ],
+    "calloutSide": "right"
+  },
+  {
+    "id": "upper-arm-r",
+    "label": "Upper Arm (R)",
+    "side": "right",
+    "polygon": [
+      [
+        290,
+        315
+      ],
+      [
+        350,
+        315
+      ],
+      [
+        342,
+        445
+      ],
+      [
+        268,
+        445
+      ]
+    ],
+    "anchor": [
+      305,
+      380
+    ],
+    "calloutSide": "left"
+  },
+  {
+    "id": "upper-arm-l",
+    "label": "Upper Arm (L)",
+    "side": "left",
+    "polygon": [
+      [
+        546,
+        315
+      ],
+      [
+        606,
+        315
+      ],
+      [
+        628,
+        445
+      ],
+      [
+        554,
+        445
+      ]
+    ],
+    "anchor": [
+      591,
+      380
+    ],
+    "calloutSide": "right"
+  },
+  {
+    "id": "elbow-r",
+    "label": "Elbow (R)",
+    "side": "right",
+    "polygon": [
+      [
+        268,
+        445
+      ],
+      [
+        342,
+        445
+      ],
+      [
+        336,
+        505
+      ],
+      [
+        252,
+        505
+      ]
+    ],
+    "anchor": [
+      295,
+      475
+    ],
+    "calloutSide": "left"
+  },
+  {
+    "id": "elbow-l",
+    "label": "Elbow (L)",
+    "side": "left",
+    "polygon": [
+      [
+        554,
+        445
+      ],
+      [
+        628,
+        445
+      ],
+      [
+        644,
+        505
+      ],
+      [
+        560,
+        505
+      ]
+    ],
+    "anchor": [
+      601,
+      475
+    ],
+    "calloutSide": "right"
+  },
+  {
+    "id": "forearm-r",
+    "label": "Forearm (R)",
+    "side": "right",
+    "polygon": [
+      [
+        252,
+        505
+      ],
+      [
+        336,
+        505
+      ],
+      [
+        320,
+        625
+      ],
+      [
+        225,
+        625
+      ]
+    ],
+    "anchor": [
+      275,
+      565
+    ],
+    "calloutSide": "left"
+  },
+  {
+    "id": "forearm-l",
+    "label": "Forearm (L)",
+    "side": "left",
+    "polygon": [
+      [
+        560,
+        505
+      ],
+      [
+        644,
+        505
+      ],
+      [
+        671,
+        625
+      ],
+      [
+        576,
+        625
+      ]
+    ],
+    "anchor": [
+      621,
+      565
+    ],
+    "calloutSide": "right"
+  },
+  {
+    "id": "hand-r",
+    "label": "Hand (R)",
+    "side": "right",
+    "polygon": [
+      [
+        225,
+        625
+      ],
+      [
+        320,
+        625
+      ],
+      [
+        305,
+        735
+      ],
+      [
+        195,
+        735
+      ]
+    ],
+    "anchor": [
+      255,
+      680
+    ],
+    "calloutSide": "left"
+  },
+  {
+    "id": "hand-l",
+    "label": "Hand (L)",
+    "side": "left",
+    "polygon": [
+      [
+        576,
+        625
+      ],
+      [
+        671,
+        625
+      ],
+      [
+        701,
+        735
+      ],
+      [
+        591,
+        735
+      ]
+    ],
+    "anchor": [
+      641,
+      680
+    ],
+    "calloutSide": "right"
+  },
+  {
+    "id": "thigh-r",
+    "label": "Thigh (R)",
+    "side": "right",
+    "polygon": [
+      [
+        335,
+        624
+      ],
+      [
+        448,
+        624
+      ],
+      [
+        440,
+        835
+      ],
+      [
+        342,
+        835
+      ]
+    ],
+    "anchor": [
+      390,
+      725
+    ],
+    "calloutSide": "left"
+  },
+  {
+    "id": "thigh-l",
+    "label": "Thigh (L)",
+    "side": "left",
+    "polygon": [
+      [
+        448,
+        624
+      ],
+      [
+        561,
+        624
+      ],
+      [
+        554,
+        835
+      ],
+      [
+        456,
+        835
+      ]
+    ],
+    "anchor": [
+      506,
+      725
+    ],
+    "calloutSide": "right"
+  },
+  {
+    "id": "knee-r",
+    "label": "Knee (R)",
+    "side": "right",
+    "polygon": [
+      [
+        342,
+        835
+      ],
+      [
+        440,
+        835
+      ],
+      [
+        435,
+        910
+      ],
+      [
+        345,
+        910
+      ]
+    ],
+    "anchor": [
+      390,
+      872
+    ],
+    "calloutSide": "left"
+  },
+  {
+    "id": "knee-l",
+    "label": "Knee (L)",
+    "side": "left",
+    "polygon": [
+      [
+        456,
+        835
+      ],
+      [
+        554,
+        835
+      ],
+      [
+        551,
+        910
+      ],
+      [
+        461,
+        910
+      ]
+    ],
+    "anchor": [
+      506,
+      872
+    ],
+    "calloutSide": "right"
+  },
+  {
+    "id": "shin-r",
+    "label": "Shin (R)",
+    "side": "right",
+    "polygon": [
+      [
+        345,
+        910
+      ],
+      [
+        435,
+        910
+      ],
+      [
+        420,
+        1060
+      ],
+      [
+        350,
+        1060
+      ]
+    ],
+    "anchor": [
+      385,
+      985
+    ],
+    "calloutSide": "left"
+  },
+  {
+    "id": "shin-l",
+    "label": "Shin (L)",
+    "side": "left",
+    "polygon": [
+      [
+        461,
+        910
+      ],
+      [
+        551,
+        910
+      ],
+      [
+        546,
+        1060
+      ],
+      [
+        476,
+        1060
+      ]
+    ],
+    "anchor": [
+      511,
+      985
+    ],
+    "calloutSide": "right"
+  },
+  {
+    "id": "foot-r",
+    "label": "Foot (R)",
+    "side": "right",
+    "polygon": [
+      [
+        350,
+        1060
+      ],
+      [
+        420,
+        1060
+      ],
+      [
+        430,
+        1148
+      ],
+      [
+        325,
+        1148
+      ]
+    ],
+    "anchor": [
+      375,
+      1105
+    ],
+    "calloutSide": "left"
+  },
+  {
+    "id": "foot-l",
+    "label": "Foot (L)",
+    "side": "left",
+    "polygon": [
+      [
+        476,
+        1060
+      ],
+      [
+        546,
+        1060
+      ],
+      [
+        571,
+        1148
+      ],
+      [
+        466,
+        1148
+      ]
+    ],
+    "anchor": [
+      521,
+      1105
+    ],
+    "calloutSide": "right"
+  }
+]

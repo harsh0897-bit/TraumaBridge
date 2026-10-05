@@ -1,203 +1,271 @@
 /**
- * TRAUMABRIDGE AI — CENTRALIZED MOTION SYSTEM
- * Built on Motion for React (motion/react) v13+
+ * TRAUMABRIDGE AI — LOCKED MOTION SPECIFICATION
+ * Motion for React (motion/react) v13+
  *
- * Import from this file instead of defining animation values ad-hoc.
- * This ensures consistent motion behavior across all surfaces.
+ * All motion values must be imported from this file.
+ * Never define ad-hoc animation magic numbers inline.
  */
 
-import type { Variants, Transition } from 'motion/react'
+'use client'
 
-// ─── Durations (in seconds) ─────────────────────────────────────────────────
+import { useState, useEffect, useRef } from 'react'
+import { useReducedMotion, animate, type Variants, type Transition } from 'motion/react'
+
+// ─── Easing ──────────────────────────────────────────────────────────────────
+export const ease: [number, number, number, number] = [0.22, 1, 0.36, 1]
+
+// Backward-compatible easing map
+export const easing = {
+  default: ease,
+  easeIn:  [0.4, 0, 1, 1] as const,
+  easeOut: ease,
+  bounce:  [0.34, 1.56, 0.64, 1] as const,
+} as const
+
+// ─── Durations (in seconds) ───────────────────────────────────────────────────
+export const durations = {
+  fast: 0.12,     // 120ms
+  base: 0.20,     // 200ms
+  gentle: 0.32,   // 320ms
+  countUp: 0.90,  // 900ms
+} as const
+
+// Backward-compatible duration map
 export const duration = {
   instant:   0,
-  fast:      0.1,
+  fast:      durations.fast,
   snappy:    0.15,
-  base:      0.2,
-  gentle:    0.3,
+  base:      durations.base,
+  gentle:    durations.gentle,
   slow:      0.5,
   cinematic: 0.8,
 } as const
 
-// ─── Easing ──────────────────────────────────────────────────────────────────
-export const easing = {
-  default: [0.4, 0, 0.2, 1] as const,
-  easeIn:  [0.4, 0, 1, 1]   as const,
-  easeOut: [0, 0, 0.2, 1]   as const,
-  bounce:  [0.34, 1.56, 0.64, 1] as const,
-} as const
+// ─── Spring Preset ───────────────────────────────────────────────────────────
+export const spring: Transition = {
+  type: 'spring',
+  stiffness: 380,
+  damping: 32,
+}
 
-// ─── Spring Presets ──────────────────────────────────────────────────────────
-export const spring = {
-  gentle: {
-    type: 'spring' as const,
-    stiffness: 200,
-    damping: 35,
-    mass: 1,
+// ─── Tile Entrance ───────────────────────────────────────────────────────────
+// Tiles fade + rise 12px, staggered 45ms
+export const tileEntrance: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 12,
   },
-  snappy: {
-    type: 'spring' as const,
-    stiffness: 300,
-    damping: 30,
-    mass: 0.8,
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: durations.gentle,
+      ease,
+    },
   },
-  bouncy: {
-    type: 'spring' as const,
-    stiffness: 400,
-    damping: 20,
-    mass: 0.6,
+  exit: {
+    opacity: 0,
+    y: -8,
+    transition: {
+      duration: durations.fast,
+      ease,
+    },
   },
-  stiff: {
-    type: 'spring' as const,
-    stiffness: 500,
-    damping: 40,
-    mass: 1,
-  },
-} as const
-
-// ─── Standard Transitions ────────────────────────────────────────────────────
-export const transition = {
-  fast:     { duration: duration.fast,    ease: easing.easeOut } satisfies Transition,
-  snappy:   { duration: duration.snappy,  ease: easing.easeOut } satisfies Transition,
-  base:     { duration: duration.base,    ease: easing.default } satisfies Transition,
-  gentle:   { duration: duration.gentle,  ease: easing.default } satisfies Transition,
-  slow:     { duration: duration.slow,    ease: easing.easeOut } satisfies Transition,
-  cinematic:{ duration: duration.cinematic, ease: easing.easeOut } satisfies Transition,
-  spring:   spring.snappy satisfies Transition,
-  springGentle: spring.gentle satisfies Transition,
-} as const
-
-// ─── Enter / Exit Variants ───────────────────────────────────────────────────
-
-/** Fade in from transparent */
-export const fadeIn: Variants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: transition.gentle },
-  exit:   { opacity: 0, transition: transition.fast },
 }
 
-/** Slide up and fade in — default for section entrances */
-export const slideUpIn: Variants = {
-  hidden:  { opacity: 0, y: 24 },
-  visible: { opacity: 1, y: 0, transition: transition.gentle },
-  exit:    { opacity: 0, y: -12, transition: transition.fast },
-}
-
-/** Slide down and fade in — for dropdowns, drawers opening from top */
-export const slideDownIn: Variants = {
-  hidden:  { opacity: 0, y: -16 },
-  visible: { opacity: 1, y: 0, transition: transition.gentle },
-  exit:    { opacity: 0, y: -8, transition: transition.fast },
-}
-
-/** Slide in from the right — for side panels and drawers */
-export const slideInRight: Variants = {
-  hidden:  { opacity: 0, x: 40 },
-  visible: { opacity: 1, x: 0, transition: spring.gentle },
-  exit:    { opacity: 0, x: 40, transition: transition.snappy },
-}
-
-/** Scale and fade — for modals and dialogs */
-export const scaleIn: Variants = {
-  hidden:  { opacity: 0, scale: 0.94 },
-  visible: { opacity: 1, scale: 1, transition: spring.snappy },
-  exit:    { opacity: 0, scale: 0.96, transition: transition.snappy },
-}
-
-/** Cinematic hero entrance — for landing page hero elements */
-export const heroEntrance: Variants = {
-  hidden:  { opacity: 0, y: 40, filter: 'blur(8px)' },
-  visible: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { duration: duration.cinematic, ease: easing.easeOut } },
-  exit:    { opacity: 0, transition: transition.slow },
-}
-
-/** Staggered children — apply to parent container */
-export const staggerContainer: Variants = {
-  hidden:  {},
+// Stagger container for tiles (stagger 45ms)
+export const stagger: Variants = {
+  hidden: {},
   visible: {
     transition: {
-      staggerChildren: 0.08,
+      staggerChildren: 0.045, // 45ms
+      delayChildren: 0.02,
+    },
+  },
+}
+
+// Backward-compatible alias for existing landing components
+export const staggerContainer: Variants = stagger
+export const staggerContainerSlow: Variants = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: 0.12,
       delayChildren: 0.1,
     },
   },
 }
 
-/** Staggered children — slower stagger for editorial sections */
-export const staggerContainerSlow: Variants = {
-  hidden:  {},
+// ─── Tab Content ─────────────────────────────────────────────────────────────
+// Crossfade + 8px slide, 220ms, for AnimatePresence mode="wait"
+export const tabContent: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 8,
+  },
   visible: {
+    opacity: 1,
+    y: 0,
     transition: {
-      staggerChildren: 0.15,
-      delayChildren: 0.2,
+      duration: 0.22,
+      ease,
+    },
+  },
+  exit: {
+    opacity: 0,
+    y: -8,
+    transition: {
+      duration: 0.16,
+      ease,
     },
   },
 }
 
-/** Card entrance — for feature cards */
-export const cardEntrance: Variants = {
-  hidden:  { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: spring.gentle },
-}
-
-/** Hospital event — new incoming events slide in from top */
-export const eventSlideIn: Variants = {
-  hidden:  { opacity: 0, y: -16, height: 0 },
-  visible: { opacity: 1, y: 0,  height: 'auto', transition: spring.gentle },
-  exit:    { opacity: 0, x: -24, transition: transition.snappy },
-}
-
-/** Status badge — for pulsing critical states */
-export const criticalPulse: Variants = {
-  normal:   { scale: 1, opacity: 1 },
-  critical: {
-    scale: [1, 1.06, 1],
-    opacity: [1, 0.8, 1],
+// Case switch: workspace keyed by case ID, exit 120ms / enter 260ms
+export const caseSwitch: Variants = {
+  hidden: {
+    opacity: 0,
+    y: 10,
+  },
+  visible: {
+    opacity: 1,
+    y: 0,
     transition: {
-      duration: 1.5,
-      repeat: Infinity,
-      ease: easing.easeOut,
+      duration: 0.26,
+      ease,
+    },
+  },
+  exit: {
+    opacity: 0,
+    y: -8,
+    transition: {
+      duration: 0.12,
+      ease,
     },
   },
 }
 
-// ─── Hover & Press States (for use with whileHover / whileTap) ───────────────
-export const hoverScale = { scale: 1.02 }
-export const hoverScaleLarge = { scale: 1.04 }
-export const pressScale = { scale: 0.97 }
+
+// ─── Hover Lift & Press ──────────────────────────────────────────────────────
+// Lift -2px + shadow step-up, 180ms | press scale 0.98
+export const hoverLift = {
+  y: -2,
+  transition: {
+    duration: 0.18,
+    ease,
+  },
+}
+
+export const press = {
+  scale: 0.98,
+  transition: {
+    duration: durations.fast,
+    ease,
+  },
+}
+
+// Backward-compatible hover/press aliases
+export const hoverScale = { scale: 1.02, transition: { duration: durations.fast, ease } }
+export const hoverScaleLarge = { scale: 1.04, transition: { duration: durations.fast, ease } }
+export const pressScale = press
 export const pressBrighter = { scale: 0.98, filter: 'brightness(1.1)' }
 
-// ─── Ambient / Floating ──────────────────────────────────────────────────────
-export const float: Variants = {
-  initial: { y: 0 },
-  animate: {
-    y: [-6, 6, -6],
+// ─── Additional Shared Variants & Backwards Compatibility ────────────────────
+export const slideUpIn: Variants = {
+  hidden:  { opacity: 0, y: 16 },
+  visible: { opacity: 1, y: 0, transition: { duration: durations.gentle, ease } },
+  exit:    { opacity: 0, y: -8, transition: { duration: durations.fast, ease } },
+}
+
+export const slideDownIn: Variants = {
+  hidden:  { opacity: 0, y: -16 },
+  visible: { opacity: 1, y: 0, transition: { duration: durations.gentle, ease } },
+  exit:    { opacity: 0, y: -8, transition: { duration: durations.fast, ease } },
+}
+
+export const slideInRight: Variants = {
+  hidden:  { opacity: 0, x: 24 },
+  visible: { opacity: 1, x: 0, transition: spring },
+  exit:    { opacity: 0, x: 24, transition: { duration: durations.fast, ease } },
+}
+
+export const scaleIn: Variants = {
+  hidden:  { opacity: 0, scale: 0.96 },
+  visible: { opacity: 1, scale: 1, transition: spring },
+  exit:    { opacity: 0, scale: 0.96, transition: { duration: durations.fast, ease } },
+}
+
+export const heroEntrance: Variants = {
+  hidden:  { opacity: 0, y: 24 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease } },
+  exit:    { opacity: 0, transition: { duration: durations.fast } },
+}
+
+export const cardEntrance: Variants = {
+  hidden:  { opacity: 0, y: 14 },
+  visible: { opacity: 1, y: 0, transition: { duration: durations.gentle, ease } },
+}
+
+export const eventSlideIn: Variants = {
+  hidden:  { opacity: 0, y: -12, height: 0 },
+  visible: { opacity: 1, y: 0, height: 'auto', transition: spring },
+  exit:    { opacity: 0, x: -16, transition: { duration: durations.fast, ease } },
+}
+
+export const singlePulse: Variants = {
+  initial: { scale: 1 },
+  pulse: {
+    scale: [1, 1.04, 1],
     transition: {
-      duration: 4,
-      repeat: Infinity,
-      ease: 'easeInOut',
+      duration: 0.45,
+      ease,
+      repeat: 0,
     },
   },
 }
 
-// ─── Page Transition Wrappers ────────────────────────────────────────────────
-export const pageTransition: Variants = {
-  hidden:  { opacity: 0 },
-  visible: { opacity: 1, transition: { duration: duration.slow, ease: easing.easeOut } },
-  exit:    { opacity: 0, transition: { duration: duration.base } },
-}
+export const criticalPulse: Variants = singlePulse
 
-// ─── Reduced Motion Safe Defaults ────────────────────────────────────────────
-/**
- * Use these in the reduce-motion context.
- * All transitions become instant; no transforms, no filters.
- */
-export const reducedMotionVariants: Variants = {
-  hidden:  { opacity: 0 },
-  visible: { opacity: 1, transition: { duration: 0 } },
-  exit:    { opacity: 0, transition: { duration: 0 } },
-}
-
-// ─── Viewport Settings ───────────────────────────────────────────────────────
-/** Standard viewport trigger for scroll-activated entrances */
-export const viewportOnce = { once: true, margin: '-60px' }
+export const viewportOnce = { once: true, margin: '-40px' }
 export const viewportRepeat = { once: false, margin: '-40px' }
+
+// ─── useCountUp Hook ─────────────────────────────────────────────────────────
+/**
+ * Hook to count up numbers on mount and tween smoothly on value changes.
+ * Respects prefers-reduced-motion (instant update without tweening).
+ */
+export function useCountUp(
+  targetValue: number,
+  options?: { duration?: number }
+): number {
+  const reducedMotion = useReducedMotion()
+  const [displayValue, setDisplayValue] = useState<number>(() => targetValue)
+  const prevTargetRef = useRef<number>(targetValue)
+  const isFirstRender = useRef(true)
+
+  useEffect(() => {
+    if (reducedMotion) {
+      setDisplayValue(targetValue)
+      prevTargetRef.current = targetValue
+      return
+    }
+
+    const start = isFirstRender.current ? 0 : prevTargetRef.current
+    isFirstRender.current = false
+    prevTargetRef.current = targetValue
+
+    const animDuration = options?.duration ?? durations.countUp
+
+    const controls = animate(start, targetValue, {
+      duration: animDuration,
+      ease,
+      onUpdate: (latest) => {
+        setDisplayValue(Math.round(latest))
+      },
+    })
+
+    return () => controls.stop()
+  }, [targetValue, reducedMotion, options?.duration])
+
+  return displayValue
+}

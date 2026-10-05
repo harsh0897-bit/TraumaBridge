@@ -1,0 +1,398 @@
+[
+  {
+    "id": "head-temple",
+    "label": "Head (Temporal / Cranium)",
+    "side": "mid",
+    "polygon": [
+      [
+        420,
+        60
+      ],
+      [
+        505,
+        60
+      ],
+      [
+        515,
+        110
+      ],
+      [
+        505,
+        145
+      ],
+      [
+        420,
+        145
+      ]
+    ],
+    "anchor": [
+      462,
+      105
+    ],
+    "calloutSide": "right"
+  },
+  {
+    "id": "face-jaw",
+    "label": "Jaw / Mandible",
+    "side": "mid",
+    "polygon": [
+      [
+        440,
+        145
+      ],
+      [
+        515,
+        145
+      ],
+      [
+        505,
+        205
+      ],
+      [
+        440,
+        205
+      ]
+    ],
+    "anchor": [
+      475,
+      175
+    ],
+    "calloutSide": "right"
+  },
+  {
+    "id": "neck-lateral",
+    "label": "Neck (Lateral)",
+    "side": "mid",
+    "polygon": [
+      [
+        430,
+        205
+      ],
+      [
+        495,
+        205
+      ],
+      [
+        500,
+        255
+      ],
+      [
+        425,
+        255
+      ]
+    ],
+    "anchor": [
+      462,
+      230
+    ],
+    "calloutSide": "right"
+  },
+  {
+    "id": "shoulder-lateral",
+    "label": "Shoulder (Lateral Deltoid)",
+    "side": "mid",
+    "polygon": [
+      [
+        410,
+        255
+      ],
+      [
+        500,
+        255
+      ],
+      [
+        505,
+        330
+      ],
+      [
+        405,
+        330
+      ]
+    ],
+    "anchor": [
+      455,
+      290
+    ],
+    "calloutSide": "left"
+  },
+  {
+    "id": "chest-lateral",
+    "label": "Lateral Chest / Axilla",
+    "side": "mid",
+    "polygon": [
+      [
+        415,
+        330
+      ],
+      [
+        520,
+        330
+      ],
+      [
+        515,
+        430
+      ],
+      [
+        415,
+        430
+      ]
+    ],
+    "anchor": [
+      465,
+      380
+    ],
+    "calloutSide": "right"
+  },
+  {
+    "id": "flank-lateral",
+    "label": "Flank (Lateral Abdomen)",
+    "side": "mid",
+    "polygon": [
+      [
+        420,
+        430
+      ],
+      [
+        510,
+        430
+      ],
+      [
+        515,
+        515
+      ],
+      [
+        415,
+        515
+      ]
+    ],
+    "anchor": [
+      465,
+      470
+    ],
+    "calloutSide": "right"
+  },
+  {
+    "id": "hip-lateral",
+    "label": "Hip / Trochanter",
+    "side": "mid",
+    "polygon": [
+      [
+        410,
+        515
+      ],
+      [
+        525,
+        515
+      ],
+      [
+        520,
+        625
+      ],
+      [
+        405,
+        625
+      ]
+    ],
+    "anchor": [
+      465,
+      570
+    ],
+    "calloutSide": "right"
+  },
+  {
+    "id": "upper-arm-lateral",
+    "label": "Upper Arm (Lateral)",
+    "side": "mid",
+    "polygon": [
+      [
+        360,
+        320
+      ],
+      [
+        415,
+        320
+      ],
+      [
+        415,
+        460
+      ],
+      [
+        355,
+        460
+      ]
+    ],
+    "anchor": [
+      385,
+      390
+    ],
+    "calloutSide": "left"
+  },
+  {
+    "id": "forearm-lateral",
+    "label": "Forearm (Lateral)",
+    "side": "mid",
+    "polygon": [
+      [
+        340,
+        460
+      ],
+      [
+        415,
+        460
+      ],
+      [
+        405,
+        590
+      ],
+      [
+        335,
+        590
+      ]
+    ],
+    "anchor": [
+      375,
+      525
+    ],
+    "calloutSide": "left"
+  },
+  {
+    "id": "hand-lateral",
+    "label": "Hand (Lateral)",
+    "side": "mid",
+    "polygon": [
+      [
+        320,
+        590
+      ],
+      [
+        395,
+        590
+      ],
+      [
+        390,
+        700
+      ],
+      [
+        315,
+        700
+      ]
+    ],
+    "anchor": [
+      355,
+      645
+    ],
+    "calloutSide": "left"
+  },
+  {
+    "id": "thigh-lateral",
+    "label": "Thigh (Lateral)",
+    "side": "mid",
+    "polygon": [
+      [
+        405,
+        625
+      ],
+      [
+        520,
+        625
+      ],
+      [
+        510,
+        840
+      ],
+      [
+        405,
+        840
+      ]
+    ],
+    "anchor": [
+      460,
+      730
+    ],
+    "calloutSide": "right"
+  },
+  {
+    "id": "knee-lateral",
+    "label": "Knee (Lateral)",
+    "side": "mid",
+    "polygon": [
+      [
+        420,
+        840
+      ],
+      [
+        505,
+        840
+      ],
+      [
+        500,
+        915
+      ],
+      [
+        415,
+        915
+      ]
+    ],
+    "anchor": [
+      460,
+      878
+    ],
+    "calloutSide": "right"
+  },
+  {
+    "id": "shin-lateral",
+    "label": "Shin / Fibula (Lateral)",
+    "side": "mid",
+    "polygon": [
+      [
+        415,
+        915
+      ],
+      [
+        495,
+        915
+      ],
+      [
+        485,
+        1060
+      ],
+      [
+        410,
+        1060
+      ]
+    ],
+    "anchor": [
+      452,
+      985
+    ],
+    "calloutSide": "right"
+  },
+  {
+    "id": "foot-lateral",
+    "label": "Foot / Malleolus",
+    "side": "mid",
+    "polygon": [
+      [
+        400,
+        1060
+      ],
+      [
+        545,
+        1060
+      ],
+      [
+        545,
+        1151
+      ],
+      [
+        390,
+        1151
+      ]
+    ],
+    "anchor": [
+      465,
+      1105
+    ],
+    "calloutSide": "right"
+  }
+]
